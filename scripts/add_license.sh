@@ -1,25 +1,40 @@
 #!/bin/bash
 
-# Add License Headers to all Python files in the src directory
-# Reference: https://pypi.org/project/licenseheaders/
+##
+##              Copyright 2025 Comcast Cable Communications Management, LLC
+##
+##              Licensed under the Apache License, Version 2.0 (the "License");
+##              you may not use this file except in compliance with the License.
+##              You may obtain a copy of the License at
+##
+##              http://www.apache.org/licenses/LICENSE-2.0
+##
+##              Unless required by applicable law or agreed to in writing, software
+##              distributed under the License is distributed on an "AS IS" BASIS,
+##              WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+##              See the License for the specific language governing permissions and
+##              limitations under the License.
+##
+##              SPDX-License-Identifier: Apache-2.0
+##
+##              This product includes software developed at Comcast (https://www.comcast.com/).##
 
 
 # Install the licenseheaders package if not already installed. Please install them manually
 # pip install --quiet licenseheaders
 
 # Add license headers using the LICENSE file in the root directory for python files
-python -m licenseheaders -t ../LICENSE -d ../src --ext py
+python -m licenseheaders -t ../NOTICE -d .. --ext py
 
-# Update the current in the LICENSE file in the root directory for python files
-# python -m licenseheaders -cy -d ../src --ext py
 
 # Add license headers using the LICENSE file in the root directory for docker files
-python -m licenseheaders -t ../LICENSE -d ../src --ext Dockerfile
-# Update the current in the LICENSE file in the root directory
-# python -m licenseheaders -cy -d ../src --ext Dockerfile
+python -m licenseheaders -t ../NOTICE -d .. --ext Dockerfile
 
 # Add license headers using the LICENSE file in the root directory for YAML files
-python -m licenseheaders -t ../LICENSE --ext .yaml
+python -m licenseheaders -t ../NOTICE --ext .yaml -d ..
 
 # Add license headers using the LICENSE file in the root directory for yml files
-python -m licenseheaders -t ../LICENSE --ext .yml
+python -m licenseheaders -t ../NOTICE --ext .yml -d ..
+
+# Add license headers using the LICENSE file in the root directory for sh files
+python -m licenseheaders -t ../NOTICE --ext .sh -d ..
