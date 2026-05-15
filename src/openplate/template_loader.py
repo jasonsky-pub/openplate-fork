@@ -16,8 +16,11 @@
 #              SPDX-License-Identifier: Apache-2.0
 #
 #              This product includes software developed at Comcast (https://www.comcast.com/).#
+from typing import Optional
+
 from liquid import Environment, FileSystemLoader
-from liquid.builtin.loaders import BaseLoader, TemplateSource
+from liquid import RenderContext
+from liquid.loader import BaseLoader, TemplateSource
 
 
 class OpenPlateTemplateLoader(BaseLoader):
@@ -25,8 +28,15 @@ class OpenPlateTemplateLoader(BaseLoader):
         self.template_string = template_string
         self.fs_loader = FileSystemLoader(paths)
 
-    def get_source(self, environment: Environment, template_name: str) -> TemplateSource:
+    def get_source(
+            self,
+            environment: Environment,
+            template_name: str,
+            *,
+            context: Optional[RenderContext] = None,
+            **kwargs: object
+    ) -> TemplateSource:
         if template_name == "":
             return TemplateSource(self.template_string, "", None)
 
-        return self.fs_loader.get_source(environment, template_name)
+        return self.fs_loader.get_source(environment, template_name, context=context, **kwargs)
