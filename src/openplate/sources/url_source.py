@@ -17,6 +17,7 @@
 #
 #              This product includes software developed at Comcast (https://www.comcast.com/).#
 import logging
+import os
 
 from openplate.cfg.open_plate_settings import OpenPlateSettings
 from openplate.git import GitClonedTemporaryFolder
@@ -30,12 +31,16 @@ class UrlTemplateSource(TemplateSource):
         self.configuration = configuration
         self._url = url
         self._gitFolder = GitClonedTemporaryFolder(self._url)
+        self._reference = self._gitFolder.reference
 
     def __str__(self):
         return f"Template: {self._url}"
 
     def folder_path(self):
-        return self._gitFolder.folder_path()
+        clone_root = self._gitFolder.folder_path()
+        if self._reference.template_path:
+            return os.path.join(clone_root, self._reference.template_path)
+        return clone_root
 
     def repo_sha(self):
         return self._gitFolder.repo_sha
@@ -49,6 +54,26 @@ class UrlTemplateSource(TemplateSource):
     def __enter__(self):
         logging.debug(f"Getting Source from url: {self._url}")
         self._gitFolder.__enter__()
+
+        selected_folder = os.path.abspath(self.folder_path())
+        clone_root = os.path.abspath(self._gitFolder.folder_path())
+        try:
+            in_clone_root = os.path.commonpath([clone_root, selected_folder]) == clone_root
+        except ValueError:
+            in_clone_root = False
+
+        if not in_clone_root:
+            self.__exit__(None, None, None)
+            raise ValueError(f"Template path escapes cloned repository: {self._reference.template_path}")
+
+        if not os.path.exists(selected_folder):
+            self.__exit__(None, None, None)
+            raise FileNotFoundError(f"Template folder not found in repository: {self._reference.template_path}")
+
+        if not os.path.isdir(selected_folder):
+            self.__exit__(None, None, None)
+            raise FileNotFoundError(f"Template folder location found but not a folder: {self._reference.template_path}")
+
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):

@@ -29,9 +29,30 @@ openplate config set --parameter-default git_org=my-org
 Add a template to a project
 
 ```
-openplate project init -n net-api#v1
-openplate project init -r git@github.com:my-org/ot-docker.git#v1
-openplate project init -f ~/templates/template1
+openplate project init https://github.com/my-org/ot-net-api.git#v1
+openplate project init git@github.com:my-org/ot-docker.git#v1
+openplate project init file:///C:/repos/template-catalog#main
+```
+
+### Supported Source URL Forms
+
+`project init` now uses URL-based sources only.
+
+- Primary syntax: `openplate project init <url>`
+- Backward-compatible syntax: `openplate project init -r <url>`
+- Supported URL transports: HTTPS, SSH/scp-style Git URLs, and Git-compatible `file://` URLs
+- Optional template sub-folder: append `?path=<relative-template-subdir>`
+- Optional branch or tag: append `#<branch-or-tag>`
+
+Examples:
+
+```
+openplate project init https://github.com/my-org/ot-template.git#v1
+openplate project init git@github.com:my-org/template-catalog.git?path=python/api#main
+openplate project init file:///C:/repos/template-catalog#main
+
+# deprecated format
+openplate project init -r https://github.com/my-org/ot-template.git#v1
 ```
 
 ### Dest Folder
@@ -41,7 +62,7 @@ Some templates take advantage of a "sub-folder" to init into.  This allows the t
 - Example:
   
   ```
-  openplate project init --dest-folder=src -r git@github.com:my-org/ot-docker.git#v1
+  openplate project init --dest-folder=src git@github.com:my-org/ot-docker.git#v1
   ```
 
 ## Command: project update
@@ -73,7 +94,7 @@ openplate project --ask-again update
 The answer to some questions are usually assumed, but you have the ability to answer them by specifying the "--ask-hidden" option
 
 ```
-openplate project --ask-hidden init -r git@github.com:my-org/ot-docker.git#v1
+openplate project --ask-hidden init git@github.com:my-org/ot-docker.git#v1
 ```
 
 or
@@ -84,21 +105,29 @@ openplate project --ask-hidden update
 
 # Template Branches
 
-NOTE: to use a specific branch or tag of a template, please append "#branchname" on init.
+NOTE: to use a specific branch or tag of a template, append `#branchname` on init. If you omit `#branchname`, you must also pass `--allow-default-branch`.
 
 Examples:
 
 ```
-openplate project init -n ss-net-microservice#0.0.9
-openplate project init -r https://github.com/my-org/ot-sometemplate#0.0.9
+openplate project init https://github.com/my-org/ot-sometemplate#0.0.9
+openplate project init --allow-default-branch https://github.com/my-org/ot-sometemplate
+```
+
+### Template Catalog Sub-Folders
+
+If a repository stores templates in sub-folders, use `?path=` to select the template root inside the repository clone.
+
+```
+openplate project init https://github.com/my-org/template-catalog.git?path=templates/net-api#v1
 ```
 
 ## No cache
 
-If you wish for a specific template to be added to this project but not "cached" in the "template cache", specify the ```--no-cache``` argument.
+If you wish for a specific template to be added to this project but not "cached" in the "template cache", specify the `--no-cache` argument.
 
 ```
-openplate project init --no-cache -r https://github.com/my-org/ot-sometemplate#0.0.9
+openplate project init --no-cache https://github.com/my-org/ot-sometemplate#0.0.9
 ```
 
 This is useful when you have:

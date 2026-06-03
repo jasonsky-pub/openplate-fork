@@ -39,10 +39,9 @@ from openplate.commands.config_set import ConfigSetOptions
 from openplate.commands.project_init import InitOptions
 from openplate.commands.project_update import UpdateOptions
 from openplate.commands.project_verify import VerifyOptions
-from openplate.sources.name_converter import convert_name
 
 
-async def async_main(args):
+def create_arg_parser(args):
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("-c", "--config-file", type=str, required=False, help="Configuration file to use (yaml)")
     arg_parser.add_argument("-d", "--debug", required=False,
@@ -96,11 +95,8 @@ async def async_main(args):
     parser_init.add_argument("--dest-folder", required=False, help="sub-folder to init into.  NOTE: This needs to be implemented in the template (dest_folder variable) to work, otherwise ignored.")
     parser_init.add_argument("-i", "--ignore", action='append', required=False,
                              help="Ignore files from template with relative path regex")
-
-    source_group = parser_init.add_mutually_exclusive_group(required=True)
-    source_group.add_argument("-r", "--url", required=False, help="Template repository url")
-    source_group.add_argument("-n", "--name", required=False, help="Template repository name")
-    source_group.add_argument("-f", "--folder", required=False, help="Local Template Folder")
+    parser_init.add_argument("source", nargs="?", help="Template source URL")
+    parser_init.add_argument("-r", "--url", required=False, help="Template source URL (legacy alias for positional source)")
     parser_init.add_argument(
         "--allow-default-branch",
         required=False,
@@ -127,6 +123,27 @@ async def async_main(args):
 
     parser_verify = project_subparsers.add_parser("verify")
     parser_verify.set_defaults(command="project-verify")
+
+    return arg_parser
+
+
+def resolve_project_init_source_reference(result) -> str:
+    source_reference = result.source or result.url
+
+    if result.source and result.url:
+        raise ValueError("Specify exactly one template source URL, either positionally or with -r/--url")
+
+    if not source_reference:
+        raise ValueError("Must specify a template source URL, ex: openplate project init https://github.com/my-org/ot-template#v1")
+
+    if "#" not in str(source_reference) and not result.allow_default_branch:
+        raise ValueError("Must specify a tag or branch name or use --allow-default-branch, ex: openplate project init https://github.com/my-org/ot-template#v1")
+
+    return source_reference
+
+
+async def async_main(args):
+    arg_parser = create_arg_parser(args)
 
     if len(args) == 1:
         arg_parser.print_help()
@@ -185,25 +202,20 @@ async def async_main(args):
         await config_get.run(configuration)
     elif result.command == "project-init":
         ignore_paths = result.ignore or []
+        source_reference = resolve_project_init_source_reference(result)
 
-        repo_reference = result.url or result.name
-        if repo_reference and "#" not in str(repo_reference) and not result.allow_default_branch:
-            raise ValueError("Must specify a tag or branch name or use --allow-default-branch, ex: url: git@location.to/template#v1 or name: template#v1")
+        if result.url and not result.source:
+            print(
+                "WARNING: The -r/--url syntax is deprecated. Use 'openplate project init <url>' instead.",
+                file=sys.stderr
+            )
 
         if result.cache is None:
             no_cache = False
         else:
             no_cache = not result.cache
 
-        if result.url:
-            template = ProjectTemplateConfig(result.url, None, None, result.dest_folder, None, {}, ignore_paths, no_cache)
-        elif result.name:
-            new_url = convert_name(configuration, result.name)
-            template = ProjectTemplateConfig(new_url, None, None, result.dest_folder, None, {}, ignore_paths, no_cache)
-        elif result.folder:
-            template = ProjectTemplateConfig(None, None, result.folder, result.dest_folder, None, {}, ignore_paths, no_cache)
-        else:
-            raise ValueError("Unknown init source")
+        template = ProjectTemplateConfig(source_reference, None, None, result.dest_folder, None, {}, ignore_paths, no_cache)
 
         options = InitOptions(template, absolute_project_folder, result.overwrite, result.allow_template_commands)
         await project_init.run(configuration, runtime_settings, options)

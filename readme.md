@@ -27,11 +27,40 @@ openplate config set --allow-template-commands
 
 
 ## Example:
-Using a template available in git at: ```git@github.com:myorganization/ot-template-name```
+Using a template available in git at: `git@github.com:myorganization/ot-template-name#main`
 
 ```
-openplate project init -r "git@github.com:myorganization/ot-template-name"
+openplate project init "git@github.com:myorganization/ot-template-name#main"
 ```
+
+Other common examples:
+
+Use an HTTPS Git URL:
+
+```
+openplate project init "https://github.com/my-org/ot-template.git#v1"
+```
+
+Use a local Git repository via `file://`:
+
+```
+openplate project init "file:///C:/repos/template-catalog#main"
+```
+
+Use a template stored in a sub-folder of a repository:
+
+```
+openplate project init "git@github.com:my-org/template-catalog.git?path=templates/net-api#v1"
+```
+
+Use the legacy `-r/--url` flag:
+
+```
+# deprecated format
+openplate project init -r "https://github.com/my-org/ot-template.git#v1"
+```
+
+The `-n/--name` and `-f/--folder` init source options are no longer supported. Use explicit URLs instead.
 
 openplate Will ask you some simple questions and then generate your project.
 
