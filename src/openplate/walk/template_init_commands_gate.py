@@ -132,7 +132,7 @@ def confirm_continue_with_template_init_commands(
             f"Template: {template_ref}\n"
             "This template defines init_commands that would run later:\n"
             f"{init_commands_block}\n\n"
-            "To allow for this init only, re-run with: openplate project init --allow-template-commands ...\n"
+            "To allow for this init only, re-run with: openplate init --allow-template-commands ...\n"
             "To allow permanently, run: openplate config set --allow-template-commands\n",
             file=stderr,
         )
@@ -143,7 +143,7 @@ def confirm_continue_with_template_init_commands(
         f"Template: {template_ref}\n"
         "This template defines init_commands that would run later:\n"
         f"{init_commands_block}\n\n"
-        "To allow for this init only and skip prompts, re-run with: openplate project init --allow-template-commands ...\n"
+        "To allow for this init only and skip prompts, re-run with: openplate init --allow-template-commands ...\n"
         "To allow permanently and skip prompts, run: openplate config set --allow-template-commands\n\n"
         "Continue processing this template? (yes/no) [no]: "
     )
@@ -185,7 +185,7 @@ def confirm_run_init_command(
             "Template init_commands require confirmation but prompting is disabled.\n"
             f"Template: {template_ref}\n"
             f"Command: {rendered_command_line}\n\n"
-            "To allow for this init only, re-run with: openplate project init --allow-template-commands ...\n"
+            "To allow for this init only, re-run with: openplate init --allow-template-commands ...\n"
             "To allow permanently, run: openplate config set --allow-template-commands\n",
             file=stderr,
         )
@@ -196,7 +196,7 @@ def confirm_run_init_command(
         f"Template: {template_ref}\n"
         "About to run:\n"
         f"{rendered_command_line}\n\n"
-        "To allow for this init only and skip prompts, re-run with: openplate project init --allow-template-commands ...\n"
+        "To allow for this init only and skip prompts, re-run with: openplate init --allow-template-commands ...\n"
         "To allow permanently and skip prompts, run: openplate config set --allow-template-commands\n\n"
         "Run this command? (yes/no) [no]: "
     )

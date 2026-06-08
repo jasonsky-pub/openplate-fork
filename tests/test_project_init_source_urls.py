@@ -34,6 +34,51 @@ def test_create_arg_parser_accepts_positional_source_url():
     assert result.url is None
 
 
+def test_create_arg_parser_accepts_top_level_init_with_shared_project_options():
+    args = ["openplate", "init", "--project-folder", "workspace", "--ask-hidden", "https://example.com/template.git#main"]
+    parser = create_arg_parser(args)
+
+    result = parser.parse_args(args[1:])
+
+    assert result.command == "project-init"
+    assert result.project_folder == "workspace"
+    assert result.ask_hidden is True
+    assert result.source == "https://example.com/template.git#main"
+
+
+def test_create_arg_parser_accepts_top_level_update_with_shared_project_options():
+    args = ["openplate", "update", "--project-folder", "workspace", "--ask-again", "--update-full"]
+    parser = create_arg_parser(args)
+
+    result = parser.parse_args(args[1:])
+
+    assert result.command == "project-update"
+    assert result.project_folder == "workspace"
+    assert result.ask_again is True
+    assert result.update_full is True
+
+
+def test_create_arg_parser_accepts_legacy_project_update_with_shared_project_options():
+    args = ["openplate", "project", "--project-folder", "workspace", "update", "--update-full"]
+    parser = create_arg_parser(args)
+
+    result = parser.parse_args(args[1:])
+
+    assert result.command == "project-update"
+    assert result.project_folder == "workspace"
+    assert result.update_full is True
+
+
+def test_create_arg_parser_top_level_help_hides_project_command():
+    parser = create_arg_parser(["openplate", "--help"])
+
+    help_text = parser.format_help()
+
+    assert "{config,init,update}" in help_text
+    assert "{config,init,update,project}" not in help_text
+    assert "==SUPPRESS==" not in help_text
+
+
 def test_resolve_project_init_source_reference_rejects_conflicting_inputs():
     result = create_arg_parser(["openplate", "project", "init"]).parse_args([
         "project", "init", "https://example.com/template.git#main", "-r", "https://example.com/other.git#main"
@@ -119,3 +164,18 @@ def test_url_template_source_uses_selected_subfolder(tmp_path):
     with UrlTemplateSource(open_plate_settings.defaultSettings, source_url) as source:
         assert Path(source.folder_path()).name == "api"
         assert (Path(source.folder_path()) / "openplate.template.yaml").exists()
+
+
+def test_documentation_uses_top_level_init_and_update_examples():
+    repo_root = Path(__file__).resolve().parents[1]
+    commands_text = (repo_root / "docs" / "commands.md").read_text(encoding="utf-8")
+    readme_text = (repo_root / "readme.md").read_text(encoding="utf-8")
+
+    assert "openplate init https://github.com/my-org/ot-template.git#v1" in commands_text
+    assert "openplate update" in commands_text
+    assert "openplate project init https://github.com/my-org/ot-template.git#v1" not in commands_text
+    assert "openplate project update" not in commands_text
+
+    assert 'openplate init "https://github.com/my-org/ot-template.git#v1"' in readme_text
+    assert "openplate update" in readme_text
+    assert "openplate project init " not in readme_text

@@ -30,7 +30,7 @@ openplate config set --allow-template-commands
 Using a template available in git at: `git@github.com:myorganization/ot-template-name#main`
 
 ```
-openplate project init "git@github.com:myorganization/ot-template-name#main"
+openplate init "git@github.com:myorganization/ot-template-name#main"
 ```
 
 Other common examples:
@@ -38,27 +38,35 @@ Other common examples:
 Use an HTTPS Git URL:
 
 ```
-openplate project init "https://github.com/my-org/ot-template.git#v1"
+openplate init "https://github.com/my-org/ot-template.git#v1"
 ```
 
 Use a local Git repository via `file://`:
 
 ```
-openplate project init "file:///C:/repos/template-catalog#main"
+openplate init "file:///C:/repos/template-catalog#main"
 ```
 
 Use a template stored in a sub-folder of a repository:
 
 ```
-openplate project init "git@github.com:my-org/template-catalog.git?path=templates/net-api#v1"
+openplate init "git@github.com:my-org/template-catalog.git?path=templates/net-api#v1"
 ```
 
 Use the legacy `-r/--url` flag:
 
 ```
 # deprecated format
-openplate project init -r "https://github.com/my-org/ot-template.git#v1"
+openplate init -r "https://github.com/my-org/ot-template.git#v1"
 ```
+
+Update an existing project from its template:
+
+```
+openplate update
+```
+
+Legacy nested `project` variants still work for compatibility, but `openplate init` and `openplate update` are the documented forms.
 
 The `-n/--name` and `-f/--folder` init source options are no longer supported. Use explicit URLs instead.
 

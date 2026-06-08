@@ -41,6 +41,67 @@ from openplate.commands.project_update import UpdateOptions
 from openplate.commands.project_verify import VerifyOptions
 
 
+def add_common_project_runtime_arguments(parser):
+    parser.add_argument("-p", "--project-folder", required=False,
+                        help="Project Folder Location: (\".\" assumed) ")
+
+    parser.add_argument("--ignore-tool-version", required=False, default=False,
+                        help="Ignore project required version (UNSAFE, mainly used for running locally not from pip)", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--ask-again", required=False, default=False,
+                        help="Ask already asked parameters again", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--ask-hidden", required=False, default=False,
+                        help="Ask parameters which are normally hidden", action=argparse.BooleanOptionalAction)
+
+
+def configure_project_init_parser(parser):
+    parser.set_defaults(command="project-init")
+    parser.add_argument("-o", "--overwrite",
+                        required=False, help="Overwrite existing files (Do not fail and update them)",
+                        action=argparse.BooleanOptionalAction)
+    parser.add_argument("--cache", required=False,
+                        action=argparse.BooleanOptionalAction, help="Cache the files from this template")
+    parser.add_argument("--dest-folder", required=False, help="sub-folder to init into.  NOTE: This needs to be implemented in the template (dest_folder variable) to work, otherwise ignored.")
+    parser.add_argument("-i", "--ignore", action='append', required=False,
+                        help="Ignore files from template with relative path regex")
+    parser.add_argument("source", nargs="?", help="Template source URL")
+    parser.add_argument("-r", "--url", required=False, help="Template source URL (legacy alias for positional source)")
+    parser.add_argument(
+        "--allow-default-branch",
+        required=False,
+        default=False,
+        help="Allow use of a default branch in a repo reference",
+        action=argparse.BooleanOptionalAction
+    )
+    parser.add_argument(
+        "--allow-template-commands",
+        required=False,
+        default=False,
+        help="One-time override to allow template-provided init_commands to run during this init.",
+        action="store_true"
+    )
+
+
+def configure_project_update_parser(parser):
+    parser.set_defaults(command="project-update")
+    parser.add_argument("-m", "--update-missing",
+                        required=False, help="Re-create missing non-template files",
+                        action=argparse.BooleanOptionalAction)
+    parser.add_argument("-f", "--update-full",
+                        required=False, help="Full update, overwrite existing non-template files (WARNING: will overwrite changes)",
+                        action=argparse.BooleanOptionalAction)
+
+
+def configure_project_verify_parser(parser):
+    parser.set_defaults(command="project-verify")
+
+
+def hide_subparser_from_help(subparsers, command_name):
+    subparsers._choices_actions = [
+        choice_action for choice_action in subparsers._choices_actions
+        if choice_action.dest != command_name
+    ]
+
+
 def create_arg_parser(args):
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("-c", "--config-file", type=str, required=False, help="Configuration file to use (yaml)")
@@ -52,7 +113,7 @@ def create_arg_parser(args):
         required=False, default=False, action=argparse.BooleanOptionalAction,
         help="Present an automation readable response instead of human readable one.  Use rules related to automation.")
 
-    subparsers = arg_parser.add_subparsers(required="--version" not in args)
+    subparsers = arg_parser.add_subparsers(required="--version" not in args, metavar="{config,init,update}")
 
     parser_config = subparsers.add_parser("config")
     config_subparsers = parser_config.add_subparsers(required=True)
@@ -73,56 +134,27 @@ def create_arg_parser(args):
         action=argparse.BooleanOptionalAction
     )
 
-    parser_project = subparsers.add_parser("project")
-    parser_project.add_argument("-p", "--project-folder", required=False,
-                                help="Project Folder Location: (\".\" assumed) ")
+    parser_init = subparsers.add_parser("init")
+    add_common_project_runtime_arguments(parser_init)
+    configure_project_init_parser(parser_init)
 
-    parser_project.add_argument("--ignore-tool-version", required=False, default=False,
-                            help="Ignore project required version (UNSAFE, mainly used for running locally not from pip)", action=argparse.BooleanOptionalAction)
-    parser_project.add_argument("--ask-again", required=False, default=False,
-                            help="Ask already asked parameters again", action=argparse.BooleanOptionalAction)
-    parser_project.add_argument("--ask-hidden", required=False, default=False,
-                            help="Ask parameters which are normally hidden", action=argparse.BooleanOptionalAction)
+    parser_update = subparsers.add_parser("update")
+    add_common_project_runtime_arguments(parser_update)
+    configure_project_update_parser(parser_update)
+
+    parser_project = subparsers.add_parser("project", help=argparse.SUPPRESS)
+    add_common_project_runtime_arguments(parser_project)
+    hide_subparser_from_help(subparsers, "project")
 
     project_subparsers = parser_project.add_subparsers(required=True)
-    parser_init = project_subparsers.add_parser("init")
-    parser_init.set_defaults(command="project-init")
-    parser_init.add_argument("-o", "--overwrite",
-                             required=False, help="Overwrite existing files (Do not fail and update them)",
-                             action=argparse.BooleanOptionalAction)
-    parser_init.add_argument("--cache", required=False,
-                             action=argparse.BooleanOptionalAction, help="Cache the files from this template")
-    parser_init.add_argument("--dest-folder", required=False, help="sub-folder to init into.  NOTE: This needs to be implemented in the template (dest_folder variable) to work, otherwise ignored.")
-    parser_init.add_argument("-i", "--ignore", action='append', required=False,
-                             help="Ignore files from template with relative path regex")
-    parser_init.add_argument("source", nargs="?", help="Template source URL")
-    parser_init.add_argument("-r", "--url", required=False, help="Template source URL (legacy alias for positional source)")
-    parser_init.add_argument(
-        "--allow-default-branch",
-        required=False,
-        default=False,
-        help="Allow use of a default branch in a repo reference",
-        action=argparse.BooleanOptionalAction
-    )
-    parser_init.add_argument(
-        "--allow-template-commands",
-        required=False,
-        default=False,
-        help="One-time override to allow template-provided init_commands to run during this init.",
-        action="store_true"
-    )
+    legacy_parser_init = project_subparsers.add_parser("init")
+    configure_project_init_parser(legacy_parser_init)
 
-    parser_update = project_subparsers.add_parser("update")
-    parser_update.set_defaults(command="project-update")
-    parser_update.add_argument("-m", "--update-missing",
-                               required=False, help="Re-create missing non-template files",
-                               action = argparse.BooleanOptionalAction)
-    parser_update.add_argument("-f", "--update-full",
-                               required=False, help="Full update, overwrite existing non-template files (WARNING: will overwrite changes)",
-                               action = argparse.BooleanOptionalAction)
+    legacy_parser_update = project_subparsers.add_parser("update")
+    configure_project_update_parser(legacy_parser_update)
 
-    parser_verify = project_subparsers.add_parser("verify")
-    parser_verify.set_defaults(command="project-verify")
+    legacy_parser_verify = project_subparsers.add_parser("verify")
+    configure_project_verify_parser(legacy_parser_verify)
 
     return arg_parser
 
@@ -134,10 +166,10 @@ def resolve_project_init_source_reference(result) -> str:
         raise ValueError("Specify exactly one template source URL, either positionally or with -r/--url")
 
     if not source_reference:
-        raise ValueError("Must specify a template source URL, ex: openplate project init https://github.com/my-org/ot-template#v1")
+        raise ValueError("Must specify a template source URL, ex: openplate init https://github.com/my-org/ot-template#v1")
 
     if "#" not in str(source_reference) and not result.allow_default_branch:
-        raise ValueError("Must specify a tag or branch name or use --allow-default-branch, ex: openplate project init https://github.com/my-org/ot-template#v1")
+        raise ValueError("Must specify a tag or branch name or use --allow-default-branch, ex: openplate init https://github.com/my-org/ot-template#v1")
 
     return source_reference
 
@@ -206,7 +238,7 @@ async def async_main(args):
 
         if result.url and not result.source:
             print(
-                "WARNING: The -r/--url syntax is deprecated. Use 'openplate project init <url>' instead.",
+                "WARNING: The -r/--url syntax is deprecated. Use 'openplate init <url>' instead.",
                 file=sys.stderr
             )
 
