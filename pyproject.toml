@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 version = {attr = "openplate.__version__"}
 
 [project]
-name = "openplate"
+name = "jsopfork"
 dynamic = ["version"]
 authors = [
     { name = "OpenPlate Contributors" },

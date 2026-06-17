@@ -16,8 +16,10 @@ To Install:
 - Type in your cli:
   
   ```
-  pip install "git+https://github.com/Comcast/OpenPlate.git@main#egg=openplate"
+  pip install jsopfork
   ```
+
+The PyPI distribution name for this fork is `jsopfork`, but the installed CLI command remains `openplate`.
 ### Security: init commands
 For security, init commands are disabled by default.  In order to run many templates you must run this once:
 
@@ -153,5 +155,4 @@ If you run into not being able to run "openplate" after installing, the pip inst
   ## For windows
   
   Use your system dialog to add a new path for where it installed
-
 
