@@ -1,0 +1,3 @@
+Before proposing or running end-to-end OpenPlate commands, read [manual-tests/index.md](manual-tests/index.md) and the relevant numbered case document under [manual-tests](manual-tests).
+
+Use the checked-in commands, fixtures, and validation checklists in [manual-tests/case-1.md](manual-tests/case-1.md), [manual-tests/case-2.md](manual-tests/case-2.md), [manual-tests/case-3.md](manual-tests/case-3.md), and [manual-tests/case-4.md](manual-tests/case-4.md) instead of reconstructing workflows from memory.

@@ -28,6 +28,9 @@ from openplate.sources.url_source import UrlTemplateSource
 from openplate.walk.recursive_walker import norm_relative_path
 
 
+_RAW_DEST_FOLDER_UNSET = object()
+
+
 class ProjectTemplateFileInfo:
     def __init__(self, relative_path: str, is_readonly: bool):
         if relative_path is None:
@@ -46,11 +49,22 @@ class ProjectTemplateConfig:
         version: Optional[str],
         parameters: dict[str, str],
         template_ignore_paths: Optional[list[str]],
-        no_cache: Optional[bool]
+        no_cache: Optional[bool],
+        raw_template_reference: Optional[str] = None,
+        raw_dest_folder = _RAW_DEST_FOLDER_UNSET,
+        raw_condition: Optional[str] = None,
     ):
         self.src_url = src_url
         self.src_name = src_name
         self.src_folder = src_folder
+        self.raw_template_reference = raw_template_reference or src_url or src_name or src_folder
+
+        if raw_dest_folder is _RAW_DEST_FOLDER_UNSET:
+            self.raw_dest_folder = dest_folder
+        else:
+            self.raw_dest_folder = raw_dest_folder
+
+        self.raw_condition = raw_condition
 
         self.dest_folder = None
         if dest_folder and dest_folder.strip():
@@ -65,6 +79,18 @@ class ProjectTemplateConfig:
         self.parameters = parameters
         self.template_ignore_paths = template_ignore_paths
         self.no_cache = no_cache
+
+    def __getstate__(self):
+        return {
+            "src_url": self.src_url,
+            "src_name": self.src_name,
+            "src_folder": self.src_folder,
+            "dest_folder": self.dest_folder,
+            "version": self.version,
+            "parameters": self.parameters,
+            "template_ignore_paths": self.template_ignore_paths,
+            "no_cache": self.no_cache,
+        }
 
     def __str__(self):
         return \
@@ -245,7 +271,9 @@ def deserialize_template(settings: OpenPlateSettings, data):
         data.get("version"),
         deserialize_string_dictionary(data.get("parameters"), "template_parameters"),
         deserialize_string_list(data.get("template_ignore_paths"), "template_ignore_paths"),
-        data.get("no_cache")
+        data.get("no_cache"),
+        data.get("src_url") or data.get("src_name") or data.get("src_folder"),
+        data.get("dest_folder"),
     )
 
 project_config_file_name = ".openplate.project.yaml"

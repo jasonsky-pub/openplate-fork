@@ -1,0 +1,3 @@
+ignore_paths:
+  - "^openplate\\.template\\.yaml$"
+min_tool_version: 999.0.0

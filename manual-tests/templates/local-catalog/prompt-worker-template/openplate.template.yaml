@@ -1,0 +1,11 @@
+default_dest_folder: "."
+ignore_paths:
+  - "^openplate\\.template\\.yaml$"
+replacement_paths:
+  - "generated/.*"
+readonly_paths:
+  - "generated/{{ dest_folder }}/managed/.*"
+parameters:
+  - name: worker_name
+    description: Worker name
+    default: prompt-worker

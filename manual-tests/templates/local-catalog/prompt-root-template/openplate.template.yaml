@@ -1,0 +1,27 @@
+default_dest_folder: "."
+ignore_paths:
+  - "^openplate\\.template\\.yaml$"
+replacement_paths:
+  - "generated/.*"
+readonly_paths:
+  - "generated/{{ dest_folder }}/managed/.*"
+parameters:
+  - name: service_name
+    description: Service name
+    default: prompt-service
+  - name: include_worker
+    description: Include worker template
+    default: "true"
+    choices:
+      - "true"
+      - "false"
+  - name: hidden_name
+    description: Hidden name
+    default: hidden-default
+    hidden: true
+require_sibling_templates:
+  - template_url: "__PROMPT_WORKER_URL__"
+    dest_folder: "worker/{{ service_name }}"
+    condition: "{{ include_worker }}"
+    parameters:
+      worker_name: "{{ service_name }}-worker"

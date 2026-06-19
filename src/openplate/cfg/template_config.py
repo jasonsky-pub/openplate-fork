@@ -300,7 +300,7 @@ def deserialize_conditional_list(data):
         for template in data:
             conditional.append(
                 ConditionalFile(
-                    template.get("location"),
+                    template.get("location") or template.get("file"),
                     template.get("condition")
                 )
             )

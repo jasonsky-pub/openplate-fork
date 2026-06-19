@@ -18,9 +18,13 @@
 #              This product includes software developed at Comcast (https://www.comcast.com/).#
 import logging
 import os
+from typing import Optional
 
 from openplate.cfg import project_config
 from openplate.cfg.open_plate_settings import OpenPlateSettings, OpenPlateRuntimeSettings
+from openplate.prompts.prompt_input_logging import log_ignored_prompt_templates
+from openplate.prompts.prompt_document_collector import collect_prompt_document_all
+from openplate.prompts.prompt_document import PromptDocument, PromptInputTracker
 from openplate.walk.source_template_recursive_walk import VerifyWalkOptions, source_template_recursive_walk_all
 
 
@@ -29,13 +33,17 @@ class UpdateOptions:
         self,
         destination: str,
         create_non_template_files: bool,
-        update_non_template_files: bool
+        update_non_template_files: bool,
+        print_prompts_json: bool = False,
+        prompt_document: Optional[PromptDocument] = None,
     ):
         if destination is None:
             raise TypeError
         self.destination = destination
         self.create_non_template_files = create_non_template_files
         self.update_non_template_files = update_non_template_files
+        self.print_prompts_json = print_prompts_json or False
+        self.prompt_document = prompt_document
 
 
 async def run(
@@ -67,7 +75,8 @@ async def run(
         options.create_non_template_files,
         options.update_non_template_files,
         False,
-        False
+        False,
+        None,
     )
 
     # if config_updated:

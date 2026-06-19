@@ -1,0 +1,3 @@
+service={{ service_name }}
+include_worker={{ include_worker }}
+hidden={{ hidden_name }}

@@ -1,0 +1,28 @@
+default_dest_folder: "."
+ignore_paths:
+  - "^openplate\\.template\\.yaml$"
+replacement_paths:
+  - "scaffold/.*"
+readonly_paths:
+  - "scaffold/{{ dest_folder }}/managed/.*"
+parameters:
+  - name: service_name
+    description: Service name
+    default: starter-service
+  - name: deployment_type
+    description: Deployment type
+    default: lambda
+    choices:
+      - lambda
+      - ec2
+  - name: instance_type
+    description: Instance type
+    default: t3.small
+    conditionally_hidden: "{% if deployment_type == 'ec2' %}true{% else %}false{% endif %}"
+  - name: hidden_token
+    description: Hidden token
+    default: hidden-default
+    hidden: true
+init_commands:
+  - command: >-
+      python -c "from pathlib import Path; Path('hooks').mkdir(exist_ok=True); Path('hooks/init-command.txt').write_text('init command ran\n', encoding='utf-8')"

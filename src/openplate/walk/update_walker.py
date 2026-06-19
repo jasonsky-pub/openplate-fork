@@ -138,7 +138,7 @@ class UpdateRecursiveWalkListener(CommonRecursiveWalkListener):
         if not is_replacement:
             shutil.copyfile(template_path, project_path)
         else:
-            with open(template_path) as stream:
+            with open(template_path, encoding="utf-8") as stream:
                 file_data = stream.read()
 
             template_dir = os.path.dirname(template_path)
@@ -155,7 +155,7 @@ class UpdateRecursiveWalkListener(CommonRecursiveWalkListener):
                 self._config_template.override_statement_end
             )
 
-            with open(project_path, "w") as stream:
+            with open(project_path, "w", encoding="utf-8") as stream:
                 stream.write(new_data)
 
         if should_be_readonly:

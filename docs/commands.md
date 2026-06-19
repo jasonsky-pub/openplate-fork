@@ -67,6 +67,12 @@ Some templates take advantage of a "sub-folder" to init into.  This allows the t
   openplate init --dest-folder=src git@github.com:my-org/ot-docker.git#v1
   ```
 
+### Re-running Init
+
+- A plain rerun of `openplate init` for the same tracked template and dest-folder is rejected.
+- `openplate init --overwrite` reruns init for the same tracked template and dest-folder and overwrites tracked template output.
+- `openplate init --overwrite` skips init-command reruns and reuses the existing tracked template entry in `.openplate.project.yaml`.
+
 ## Command: update
 
 Update the current project with the latest versions of the template
@@ -76,6 +82,109 @@ openplate update
 ```
 
 The legacy nested `project` variant still works for compatibility, but `openplate update` is the documented command.
+
+Common update modes:
+
+```
+openplate update --update-missing
+openplate update --update-full
+```
+
+- `--update-missing` recreates missing non-readonly files without overwriting existing non-readonly files.
+- `--update-full` is the overwrite-oriented maintenance mode. It recreates missing non-readonly files and overwrites existing non-readonly files.
+
+## Prompt JSON Workflow
+
+For machine-driven init runs, OpenPlate can export the prompt state as JSON, let you fill in only the answers you care about, and then consume that JSON during `init` without falling back to interactive prompting.
+
+Export the init prompt tree:
+
+```
+openplate project print-init-json https://github.com/my-org/ot-template.git#v1
+openplate project print-init-json https://github.com/my-org/ot-template.git#v1 --verbose
+```
+
+Import answers from a file or standard input:
+
+```
+openplate init https://github.com/my-org/ot-template.git#v1 --prompts-json-file prompts.json
+type prompts.json | openplate init https://github.com/my-org/ot-template.git#v1 --prompts-json-stdin
+```
+
+`project print-init-json` is read-only. It does not update `.openplate.project.yaml` or write template output.
+
+The compact export format is a top-level JSON array of prompt nodes:
+
+```json
+[
+  {
+    "node-id": "15cff52",
+    "answers": {
+      "service_name": null
+    }
+  }
+]
+```
+
+The verbose export includes the same `node-id` and `answers` fields plus `info` metadata:
+
+```json
+[
+  {
+    "node-id": "15cff52",
+    "answers": {
+      "service_name": null
+    },
+    "info": {
+      "template": "https://github.com/my-org/ot-template.git#v1",
+      "dest_folder": ".",
+      "parameters": {
+        "service_name": {
+          "default": null,
+          "existing": null,
+          "description": "Service Name",
+          "choices": null,
+          "hidden": null,
+          "required": true
+        }
+      }
+    }
+  }
+]
+```
+
+Key semantics:
+
+- `node-id` is the import/export identity for a reached init node.
+- `answers` contains only the prompt answers used on import.
+- compact export omits `info`.
+- verbose export includes `info.template`, init-relative `info.dest_folder`, and prompt metadata.
+- when present, verbose `info.require_sibling_templates` describes caller-side sibling declarations, including any sibling `condition` metadata.
+- the init root from `openplate init --dest-folder ...` is not part of exported `node-id` values or exported `info.dest_folder` values.
+
+Hidden parameters are included only when the command uses `--ask-hidden`. Without `--ask-hidden`, hidden parameters are omitted from prompt JSON export and ignored on prompt JSON import.
+
+Answer semantics:
+
+- `null` means do not answer this parameter from JSON; if the parameter is reached, OpenPlate uses the normal runtime fallback such as an existing value or template/default value
+- `""` means an intentional blank string answer
+- any other non-null string means an explicit supplied answer for that parameter
+- omitting an answer key also means unresolved, so normal runtime fallback applies if that parameter is reached
+
+Import semantics:
+
+- OpenPlate matches imported prompt JSON by `node-id`.
+- `info` is ignored on import.
+- For parameters in scope for the command, any non-null answer is authoritative even if runtime fallback already has an existing or default value.
+- `--ask-again` affects interactive prompting. It does not prevent a non-null prompt JSON answer from being applied.
+
+Notes:
+
+- `project print-init-json` is the only mode that walks the full declared sibling tree without applying sibling `condition` filters.
+- `--prompts-json-file` and `--prompts-json-stdin` are supported for init only.
+- `project update` does not expose prompt JSON flags.
+- imported nodes that are not processed by the run are ignored and logged by `node-id`.
+- OpenPlate warns when supplied prompt answers are left unused for a matched node.
 
 ## Command: project verify
 
@@ -106,6 +215,8 @@ or
 ```
 openplate update --ask-hidden
 ```
+
+The same flag controls prompt JSON scope. With `--ask-hidden`, hidden parameters are included in `project print-init-json` output and may be answered through `--prompts-json-file` or `--prompts-json-stdin` on `init`. Without it, hidden parameters are omitted from export and ignored on import.
 
 # Template Branches
 

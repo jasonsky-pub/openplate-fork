@@ -18,12 +18,14 @@
 #              This product includes software developed at Comcast (https://www.comcast.com/).#
 import logging
 import os
+from typing import Optional
 
 from openplate import project_config_resolver, template_processor
+from openplate.prompts.prompt_document import PromptInputTracker
 from openplate.cfg import template_config, project_config
 from openplate.cfg.open_plate_settings import OpenPlateSettings, OpenPlateRuntimeSettings
-from openplate.cfg.project_config import ProjectTemplateConfig
 from openplate.git import get_git_last_tag
+from openplate.sibling_template_resolver import render_sibling_template_config
 from openplate.shell_command_processor import process_command
 from openplate.util import str_to_bool
 from openplate.walk import template_init_commands_gate
@@ -46,7 +48,8 @@ async def source_template_recursive_walk_all(
     create_non_template_files: bool,
     update_non_template_files: bool,
     raise_error_on_verify: bool,
-    fail_on_prompt: bool
+    fail_on_prompt: bool,
+    prompt_input_tracker: Optional[PromptInputTracker] = None,
 ):
     project_config_changed = False
     found_changes = False
@@ -66,7 +69,8 @@ async def source_template_recursive_walk_all(
             create_non_template_files,
             update_non_template_files,
             raise_error_on_verify,
-            fail_on_prompt
+            fail_on_prompt,
+            prompt_input_tracker,
         )
         if current_project_config_changed:
             project_config_changed = True
@@ -91,7 +95,8 @@ async def source_template_recursive_walk_single(
     create_non_template_files: bool,
     update_non_template_files: bool,
     raise_error_on_verify: bool,
-    fail_on_prompt: bool
+    fail_on_prompt: bool,
+    prompt_input_tracker: Optional[PromptInputTracker] = None,
 ):
     # Note, Dest folder is no longer a root for the template
     # both the repo root and the dest folder will be available to the template
@@ -135,9 +140,8 @@ async def source_template_recursive_walk_single(
                 settings,
                 os.path.join(source.folder_path(), project_config.project_config_file_name)
             )
-        except Exception as e:
+        except Exception:
             logging.debug(f"No Template Project config or other error (ok)")
-
 
         # Answer questions:
         if project_config_resolver.resolve(
@@ -148,7 +152,8 @@ async def source_template_recursive_walk_single(
             config_project_template,
             project_folder,
             source.folder_path(),
-            fail_on_prompt
+            fail_on_prompt,
+            prompt_input_tracker,
         ):
             project_config_changed = True
 
@@ -184,57 +189,11 @@ async def source_template_recursive_walk_single(
                         logging.debug(f"Skipping sibling template {sibling_template.template_url} due to condition result: {rendered_condition}")
                         continue
 
-                sibling_template.template_url = template_processor.process(
+                model_template_config = render_sibling_template_config(
+                    config_template,
                     template_options,
-                    str(sibling_template.template_url),
-                    [],
-                    "Sibling Template URL",
-                    config_template.override_tag_start,
-                    config_template.override_tag_end,
-                    config_template.override_statement_start,
-                    config_template.override_statement_end
-                )
-                parameters = {}
-                if sibling_template.parameters is not None:
-                    for key, value in sibling_template.parameters.items():
-                        parameters[key] = template_processor.process(
-                            template_options,
-                            str(value),
-                            [],
-                            "Sibling Template Parameter[" + key + "]",
-                            config_template.override_tag_start,
-                            config_template.override_tag_end,
-                            config_template.override_statement_start,
-                            config_template.override_statement_end
-                        )
-
-                # If specified, take the one in the template:
-                if sibling_template.dest_folder:
-                    new_dest_folder = sibling_template.dest_folder
-                else:
-                    # Else, throw an exception:
-                    raise ValueError(f"Template {source.__str__()} requires sibling but does not specify it's dest_folder")
-
-                processed_dest_folder = template_processor.process(
-                    template_options,
-                    str(new_dest_folder),
-                    [],
-                    "Destination folder: " + str(new_dest_folder),
-                    config_template.override_tag_start,
-                    config_template.override_tag_end,
-                    config_template.override_statement_start,
-                    config_template.override_statement_end
-                )
-
-                model_template_config = ProjectTemplateConfig(
-                    sibling_template.template_url,
-                        None,
-                    None,
-                    processed_dest_folder,
-                    None,
-                    parameters,
-                    None,
-                    None
+                    sibling_template,
+                    source,
                 )
 
                 # If the template isnt already on the project, add it and walk it before continuing:
@@ -257,7 +216,8 @@ async def source_template_recursive_walk_single(
                             create_non_template_files,
                             update_non_template_files,
                             raise_error_on_verify,
-                            fail_on_prompt
+                            fail_on_prompt,
+                            prompt_input_tracker,
                         )
                     if sub_found_changes:
                         found_changes = True

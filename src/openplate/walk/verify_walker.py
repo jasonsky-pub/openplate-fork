@@ -123,7 +123,7 @@ class VerifyRecursiveWalkListener(CommonRecursiveWalkListener):
                         if not binary_files_equal(template_path, project_path):
                             up_to_date = False
                     else:
-                        with open(template_path) as stream:
+                        with open(template_path, encoding="utf-8") as stream:
                             file_data = stream.read()
 
                         template_dir = os.path.dirname(template_path)
@@ -140,7 +140,7 @@ class VerifyRecursiveWalkListener(CommonRecursiveWalkListener):
                             self._config_template.override_statement_end
                         )
 
-                        with open(project_path) as file:
+                        with open(project_path, encoding="utf-8") as file:
                             existing_contents = file.read()
 
                         if processed_contents != existing_contents:

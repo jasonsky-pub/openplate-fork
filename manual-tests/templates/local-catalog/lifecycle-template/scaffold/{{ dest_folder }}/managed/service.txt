@@ -1,0 +1,4 @@
+service={{ service_name }}
+deployment={{ deployment_type }}
+instance={{ instance_type }}
+hidden={{ hidden_token }}

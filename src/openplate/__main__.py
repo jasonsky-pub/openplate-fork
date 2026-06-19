@@ -33,12 +33,16 @@ from openplate.commands import (
     config_set,
     project_init,
     project_update,
-    project_verify
+    project_verify,
 )
 from openplate.commands.config_set import ConfigSetOptions
 from openplate.commands.project_init import InitOptions
 from openplate.commands.project_update import UpdateOptions
 from openplate.commands.project_verify import VerifyOptions
+from openplate.prompts.prompt_document_cli import (
+    add_prompt_document_input_arguments,
+    load_prompt_document as load_prompt_document_from_args,
+)
 
 
 def add_common_project_runtime_arguments(parser):
@@ -79,6 +83,7 @@ def configure_project_init_parser(parser):
         help="One-time override to allow template-provided init_commands to run during this init.",
         action="store_true"
     )
+    add_prompt_document_input_arguments(parser)
 
 
 def configure_project_update_parser(parser):
@@ -147,6 +152,24 @@ def create_arg_parser(args):
     hide_subparser_from_help(subparsers, "project")
 
     project_subparsers = parser_project.add_subparsers(required=True)
+    parser_print_init_json = project_subparsers.add_parser("print-init-json")
+    parser_print_init_json.set_defaults(command="project-print-init-json")
+    parser_print_init_json.add_argument("source", help="Template source URL")
+    parser_print_init_json.add_argument(
+        "--allow-default-branch",
+        required=False,
+        default=False,
+        help="Allow use of a default branch in a repo reference",
+        action=argparse.BooleanOptionalAction
+    )
+    parser_print_init_json.add_argument(
+        "--verbose",
+        required=False,
+        default=False,
+        help="Include descriptive node metadata in the printed JSON output.",
+        action="store_true"
+    )
+
     legacy_parser_init = project_subparsers.add_parser("init")
     configure_project_init_parser(legacy_parser_init)
 
@@ -160,9 +183,9 @@ def create_arg_parser(args):
 
 
 def resolve_project_init_source_reference(result) -> str:
-    source_reference = result.source or result.url
+    source_reference = result.source or getattr(result, "url", None)
 
-    if result.source and result.url:
+    if result.source and getattr(result, "url", None):
         raise ValueError("Specify exactly one template source URL, either positionally or with -r/--url")
 
     if not source_reference:
@@ -172,6 +195,10 @@ def resolve_project_init_source_reference(result) -> str:
         raise ValueError("Must specify a tag or branch name or use --allow-default-branch, ex: openplate init https://github.com/my-org/ot-template#v1")
 
     return source_reference
+
+
+def load_prompt_document(result):
+    return load_prompt_document_from_args(result)
 
 
 async def async_main(args):
@@ -209,7 +236,6 @@ async def async_main(args):
     else:
         runtime_settings = OpenPlateRuntimeSettings(False, False, False, result.automation)
 
-    # set-config can run without a valid configuration file
     if result.command == "config-set":
         defaults = {}
 
@@ -235,6 +261,7 @@ async def async_main(args):
     elif result.command == "project-init":
         ignore_paths = result.ignore or []
         source_reference = resolve_project_init_source_reference(result)
+        prompt_document = load_prompt_document(result)
 
         if result.url and not result.source:
             print(
@@ -247,15 +274,45 @@ async def async_main(args):
         else:
             no_cache = not result.cache
 
-        template = ProjectTemplateConfig(source_reference, None, None, result.dest_folder, None, {}, ignore_paths, no_cache)
+        template = ProjectTemplateConfig(
+            source_reference,
+            None,
+            None,
+            result.dest_folder,
+            None,
+            {},
+            ignore_paths,
+            no_cache,
+            raw_dest_folder=None,
+        )
 
-        options = InitOptions(template, absolute_project_folder, result.overwrite, result.allow_template_commands)
+        options = InitOptions(
+            template,
+            absolute_project_folder,
+            result.overwrite,
+            result.allow_template_commands,
+            prompt_document=prompt_document,
+        )
         await project_init.run(configuration, runtime_settings, options)
+    elif result.command == "project-print-init-json":
+        source_reference = resolve_project_init_source_reference(result)
+        template = ProjectTemplateConfig(source_reference, None, None, None, None, {}, [], False)
+        await project_init.print_prompt_document(
+            configuration,
+            runtime_settings,
+            template,
+            absolute_project_folder,
+            result.verbose,
+        )
     elif result.command == "project-verify":
         options = VerifyOptions(absolute_project_folder)
         await project_verify.run(configuration, runtime_settings, options)
     elif result.command == "project-update":
-        options = UpdateOptions(absolute_project_folder, result.update_missing, result.update_full)
+        options = UpdateOptions(
+            absolute_project_folder,
+            result.update_missing,
+            result.update_full,
+        )
         await project_update.run(configuration, runtime_settings, options)
     else:
         raise Exception(f"Unknown Command: {result.command}")
