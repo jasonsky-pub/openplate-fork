@@ -37,7 +37,7 @@ def compile_template_options(
         source_folder: str,
         destination_folder: str,
         ignore_tool_version: bool
-) -> dict[str, str]:
+) -> dict[str, object]:
 
     if not ignore_tool_version:
         if config_template.min_tool_version is not None and config_template.min_tool_version.strip():
@@ -54,16 +54,31 @@ def compile_template_options(
         options[key] = config_project_template.parameters[key]
 
     options["dest_folder"] = config_project_template.dest_folder
-    options["project_folder_name"] = config_project.project_folder_name
+    options["project_git_mode"] = bool(getattr(config_project, "project_git_mode", False))
+    options["project_folder_name"] = config_project.project_folder_name or ""
     options["project_src_url"] = config_project.project_src_url or ""
-    options["project_repo_name"] = config_project.project_repo_name or ""
-    options["project_repo_org"] = config_project.project_repo_org or ""
+    options["project_git_repo_url"] = getattr(config_project, "project_git_repo_url", "") or ""
+    options["project_git_ssh_repo_url"] = getattr(config_project, "project_git_ssh_repo_url", "") or ""
+    options["project_git_https_repo_url"] = getattr(config_project, "project_git_https_repo_url", "") or ""
+    options["project_git_repo_org"] = getattr(config_project, "project_git_repo_org", "") or ""
+    options["project_git_repo_name"] = getattr(config_project, "project_git_repo_name", "") or ""
+    options["project_repo_name"] = getattr(config_project, "project_repo_name", "") or ""
+    options["project_repo_org"] = getattr(config_project, "project_repo_org", "") or ""
     options["project_guid1"] = config_project.project_guid1 or ""
     options["project_guid2"] = config_project.project_guid2 or ""
     options["project_guid3"] = config_project.project_guid3 or ""
     options["last_updater_email"] = config_project.last_updater_email or ""
 
-    options["template_src_url"] = config_project_template.src_url or ""
+    options["template_src_url"] = getattr(config_project_template, "template_src_url", None) or config_project_template.src_url or ""
+    options["template_git_ssh_src_url"] = getattr(config_project_template, "template_git_ssh_src_url", "") or ""
+    options["template_git_https_src_url"] = getattr(config_project_template, "template_git_https_src_url", "") or ""
+    options["template_git_repo_url"] = getattr(config_project_template, "template_git_repo_url", "") or ""
+    options["template_git_ssh_repo_url"] = getattr(config_project_template, "template_git_ssh_repo_url", "") or ""
+    options["template_git_https_repo_url"] = getattr(config_project_template, "template_git_https_repo_url", "") or ""
+    options["template_git_repo_org"] = getattr(config_project_template, "template_git_repo_org", "") or ""
+    options["template_git_repo_name"] = getattr(config_project_template, "template_git_repo_name", "") or ""
+    options["template_git_repo_path"] = getattr(config_project_template, "template_git_repo_path", "") or ""
+    options["template_git_repo_ref"] = getattr(config_project_template, "template_git_repo_ref", "") or ""
     options["template_version"] = config_project_template.version or ""
 
     for (config_file_key, config_file_location) in config_template.config_files.items():

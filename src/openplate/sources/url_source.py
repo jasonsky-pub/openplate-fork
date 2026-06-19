@@ -20,7 +20,7 @@ import logging
 import os
 
 from openplate.cfg.open_plate_settings import OpenPlateSettings
-from openplate.git import GitClonedTemporaryFolder
+from openplate.git import GitClonedTemporaryFolder, GitTemplateReference, GitUrlInfo, parse_git_url
 from openplate.sources.source import TemplateSource
 
 
@@ -44,6 +44,19 @@ class UrlTemplateSource(TemplateSource):
 
     def repo_sha(self):
         return self._gitFolder.repo_sha
+
+    def git_reference(self) -> GitTemplateReference:
+        return self._reference
+
+    def git_url_info(self) -> GitUrlInfo | None:
+        return parse_git_url(self._reference.repo_location)
+
+    def resolved_ref(self):
+        head_reference = getattr(self._gitFolder, "head_reference", None)
+        if head_reference is None:
+            return None
+
+        return head_reference.value
 
     def template_url(self):
         return self._url

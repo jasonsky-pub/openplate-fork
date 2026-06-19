@@ -20,7 +20,6 @@ import hashlib
 import json
 
 from openplate.cfg.open_plate_settings import OpenPlateSettings
-from openplate.sources.name_converter import convert_name
 from openplate.walk.recursive_walker import norm_relative_path
 
 
@@ -78,8 +77,4 @@ def prompt_condition(config_project_template):
 def source_cache_key(settings: OpenPlateSettings, config_project_template):
     if config_project_template.src_url:
         return ("url", config_project_template.src_url)
-    if config_project_template.src_name:
-        return ("url", convert_name(settings, config_project_template.src_name))
-    if config_project_template.src_folder:
-        return ("folder", config_project_template.src_folder)
-    raise ValueError("Unknown template source")
+    raise ValueError("Unknown or unsupported template source")

@@ -39,15 +39,22 @@ from openplate.commands.config_set import ConfigSetOptions
 from openplate.commands.project_init import InitOptions
 from openplate.commands.project_update import UpdateOptions
 from openplate.commands.project_verify import VerifyOptions
+from openplate.project_runtime_context import resolve_project_runtime_context
 from openplate.prompts.prompt_document_cli import (
     add_prompt_document_input_arguments,
     load_prompt_document as load_prompt_document_from_args,
 )
 
 
+class DeprecatedProjectFolderAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        parser.error("The --project-folder option has been renamed. Use --project-root instead.")
+
+
 def add_common_project_runtime_arguments(parser):
-    parser.add_argument("-p", "--project-folder", required=False,
-                        help="Project Folder Location: (\".\" assumed) ")
+    parser.add_argument("-p", "--project-root", required=False,
+                        help="Project Root Location: (current folder or Git top-level assumed) ")
+    parser.add_argument("--project-folder", required=False, help=argparse.SUPPRESS, action=DeprecatedProjectFolderAction)
 
     parser.add_argument("--ignore-tool-version", required=False, default=False,
                         help="Ignore project required version (UNSAFE, mainly used for running locally not from pip)", action=argparse.BooleanOptionalAction)
@@ -128,8 +135,6 @@ def create_arg_parser(args):
 
     parser_set_config = config_subparsers.add_parser("set")
     parser_set_config.set_defaults(command="config-set")
-    parser_set_config.add_argument("-u", "--vcs-url", required=False, help="VCS url to use")
-    parser_set_config.add_argument("-p", "--template-prefix", required=False, help="Template Prefix")
     parser_set_config.add_argument("--parameter-default", required=False, help="Set a default parameter value, --parameter-default \"param1=something\" or to remove, --parameter-default \"param1=\"", action='append')
     parser_set_config.add_argument(
         "--allow-template-commands",
@@ -228,22 +233,23 @@ async def async_main(args):
         configuration = open_plate_settings.defaultSettings
 
     runtime_settings = None
-    absolute_project_folder = None
+    project_context = None
     if result.command.startswith("project"):
         runtime_settings = OpenPlateRuntimeSettings(result.ask_again, result.ask_hidden, result.ignore_tool_version, result.automation)
-        project_folder = result.project_folder or "."
-        absolute_project_folder = os.path.abspath(project_folder)
+        project_context = resolve_project_runtime_context(
+            os.getcwd(),
+            getattr(result, "project_root", None),
+            getattr(result, "dest_folder", None) if result.command == "project-init" else None,
+        )
     else:
         runtime_settings = OpenPlateRuntimeSettings(False, False, False, result.automation)
 
     if result.command == "config-set":
         defaults = {}
 
-        if (not result.template_prefix
-                and not result.vcs_url
-                and not result.parameter_default
+        if (not result.parameter_default
                 and result.allow_template_commands is None):
-            raise ValueError("Must set at least one setting (template-prefix, vcs-url, parameter-default, allow-template-commands)")
+            raise ValueError("Must set at least one setting (parameter-default, allow-template-commands)")
 
         if result.parameter_default:
             for parameter_string in result.parameter_default:
@@ -254,7 +260,7 @@ async def async_main(args):
                 value = parts[1]
                 defaults[key] = value
 
-        options = ConfigSetOptions(config_file, result.vcs_url, result.template_prefix, defaults, result.allow_template_commands)
+        options = ConfigSetOptions(config_file, defaults, result.allow_template_commands)
         await config_set.run(configuration, options)
     elif result.command == "config-get":
         await config_get.run(configuration)
@@ -278,7 +284,7 @@ async def async_main(args):
             source_reference,
             None,
             None,
-            result.dest_folder,
+            project_context.dest_folder,
             None,
             {},
             ignore_paths,
@@ -288,7 +294,7 @@ async def async_main(args):
 
         options = InitOptions(
             template,
-            absolute_project_folder,
+            project_context.project_root_folder,
             result.overwrite,
             result.allow_template_commands,
             prompt_document=prompt_document,
@@ -296,20 +302,20 @@ async def async_main(args):
         await project_init.run(configuration, runtime_settings, options)
     elif result.command == "project-print-init-json":
         source_reference = resolve_project_init_source_reference(result)
-        template = ProjectTemplateConfig(source_reference, None, None, None, None, {}, [], False)
+        template = ProjectTemplateConfig(source_reference, None, None, project_context.dest_folder, None, {}, [], False)
         await project_init.print_prompt_document(
             configuration,
             runtime_settings,
             template,
-            absolute_project_folder,
+            project_context.project_root_folder,
             result.verbose,
         )
     elif result.command == "project-verify":
-        options = VerifyOptions(absolute_project_folder)
+        options = VerifyOptions(project_context.project_root_folder)
         await project_verify.run(configuration, runtime_settings, options)
     elif result.command == "project-update":
         options = UpdateOptions(
-            absolute_project_folder,
+            project_context.project_root_folder,
             result.update_missing,
             result.update_full,
         )

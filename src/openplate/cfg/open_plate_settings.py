@@ -36,6 +36,12 @@ class OpenPlateSettings:
         self.default_values = default_values or {}
         self.allow_template_commands = allow_template_commands or False
 
+    def __getstate__(self):
+        return {
+            "default_values": self.default_values,
+            "allow_template_commands": self.allow_template_commands,
+        }
+
 class OpenPlateRuntimeSettings:
     def __init__(
             self,
@@ -69,8 +75,8 @@ def deserialize_settings(data):
         allow_template_commands = str_to_bool(allow_template_commands_raw)
 
     return OpenPlateSettings(
-        data.get("vcs_url") or defaultSettings.vcs_url,
-        data.get("template_prefix") or defaultSettings.template_prefix,
+        defaultSettings.vcs_url,
+        defaultSettings.template_prefix,
         deserialize_string_dictionary(data.get("default_values"), "default_values"),
         allow_template_commands
     )

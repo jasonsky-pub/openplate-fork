@@ -22,13 +22,31 @@ from typing import Optional
 from openplate.cfg import serialization
 from openplate.cfg.open_plate_settings import OpenPlateSettings
 from openplate.cfg.serialization import deserialize_string_dictionary, deserialize_string_list
-from openplate.sources.folder_source import FolderTemplateSource
-from openplate.sources.name_converter import convert_name
 from openplate.sources.url_source import UrlTemplateSource
 from openplate.walk.recursive_walker import norm_relative_path
 
 
 _RAW_DEST_FOLDER_UNSET = object()
+
+
+def _normalize_legacy_source_field(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+
+    stripped_value = str(value).strip()
+    if not stripped_value:
+        return None
+
+    return stripped_value
+
+
+def _reject_legacy_source_field(value: Optional[str], field_name: str):
+    normalized_value = _normalize_legacy_source_field(value)
+    if normalized_value is not None:
+        raise RuntimeError(
+            f"Project configuration field '{field_name}' is no longer supported. "
+            "URL-backed template references are required."
+        )
 
 
 class ProjectTemplateFileInfo:
@@ -83,8 +101,6 @@ class ProjectTemplateConfig:
     def __getstate__(self):
         return {
             "src_url": self.src_url,
-            "src_name": self.src_name,
-            "src_folder": self.src_folder,
             "dest_folder": self.dest_folder,
             "version": self.version,
             "parameters": self.parameters,
@@ -111,14 +127,8 @@ class ProjectTemplateConfig:
     def to_source(self, settings: OpenPlateSettings):
         if self.src_url:
             return UrlTemplateSource(settings, self.src_url)
-        elif self.src_name:
-            # Used to record the name in the template file, now record url
-            new_url = convert_name(settings, self.src_name)
-            return UrlTemplateSource(settings, new_url)
-        elif self.src_folder:
-            return FolderTemplateSource(settings, self.src_folder)
         else:
-            raise ValueError("Unknown template source")
+            raise ValueError("Unknown or unsupported template source")
 
 class ProjectConfig:
     def __init__(
@@ -165,6 +175,16 @@ class ProjectConfig:
         self.template_file_cache = template_file_cache
         self.last_updater_email = last_updater_email
 
+    def __getstate__(self):
+        return {
+            "templates": self.templates,
+            "project_guid1": self.project_guid1,
+            "project_guid2": self.project_guid2,
+            "project_guid3": self.project_guid3,
+            "template_file_cache": self.template_file_cache,
+            "last_updater_email": self.last_updater_email,
+        }
+
     def has_template(self, config: ProjectTemplateConfig) -> bool:
         assert config is not None
         for template in self.templates:
@@ -207,15 +227,17 @@ def to_file(data: ProjectConfig, file_name: str):
 
 
 def deserialize_project_config(settings: OpenPlateSettings, data):
+    _reject_legacy_source_field(data.get("template_src_folder"), "template_src_folder")
+
     return ProjectConfig(
         deserialize_templates(settings, data.get("templates")),
         data.get("template_src_url"),
-        data.get("template_src_folder"),
+        None,
         data.get("template_version"),
-        data.get("project_folder_name"),
-        data.get("project_src_url"),
-        data.get("project_repo_org"),
-        data.get("project_repo_name"),
+        None,
+        None,
+        None,
+        None,
         data.get("project_guid1"),
         data.get("project_guid2"),
         data.get("project_guid3"),
@@ -256,17 +278,14 @@ def deserialize_templates(settings: OpenPlateSettings, data):
 
 def deserialize_template(settings: OpenPlateSettings, data):
     url = data.get("src_url")
-    name = data.get("src_name")
 
-    # Fix name on load so that on save it is written out as a url:
-    if url is None and name is not None:
-        url = convert_name(settings, name)
-        name = None
+    _reject_legacy_source_field(data.get("src_name"), "src_name")
+    _reject_legacy_source_field(data.get("src_folder"), "src_folder")
 
     return ProjectTemplateConfig(
         url,
-        name,
-        data.get("src_folder"),
+        None,
+        None,
         data.get("dest_folder"),
         data.get("version"),
         deserialize_string_dictionary(data.get("parameters"), "template_parameters"),

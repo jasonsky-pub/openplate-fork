@@ -13,8 +13,10 @@ openplate config get
 Set configuration for the tool (available in ~/.openplate)
 
 ```
-openplate config set --vcs-url https://github.com/my-org
+openplate config set --parameter-default service_name=my-service
 ```
+
+`config set` now supports persistent parameter defaults and the `--allow-template-commands` safety setting. Legacy source-resolution settings such as `--vcs-url` and `--template-prefix` are no longer supported runtime configuration.
 
 ### Default Parameters
 
@@ -46,6 +48,23 @@ openplate init file:///C:/repos/template-catalog#main
 
 The legacy nested `project` variant still works for compatibility, but `openplate init` is the documented command.
 
+### Project Root Resolution
+
+`init`, `update`, `project verify`, and `project print-init-json` share the `--project-root` option.
+
+- `--project-root <path>` sets the managed project root explicitly.
+- if `--project-root` is omitted and the invocation folder is inside a Git work tree, OpenPlate uses the Git top-level folder as the project root and the invocation-relative path as the default `dest_folder`
+- if `--project-root` is omitted outside Git, OpenPlate uses the invocation folder and defaults `dest_folder` to `.`
+- `--project-folder` is no longer accepted; use `--project-root` instead
+
+Examples:
+
+```
+openplate init --project-root C:/workspaces/my-repo https://github.com/my-org/ot-template.git#v1
+openplate update --project-root C:/workspaces/my-repo --update-full
+openplate project verify --project-root C:/workspaces/my-repo
+```
+
 Examples:
 
 ```
@@ -66,6 +85,12 @@ Some templates take advantage of a "sub-folder" to init into.  This allows the t
   ```
   openplate init --dest-folder=src git@github.com:my-org/ot-docker.git#v1
   ```
+
+If `--dest-folder` is omitted:
+
+- with an explicit `--project-root`, it resolves to `.`
+- inside Git without an explicit `--project-root`, it resolves to the relative path from the Git top-level folder to the invocation folder
+- outside Git, it resolves to `.`
 
 ### Re-running Init
 

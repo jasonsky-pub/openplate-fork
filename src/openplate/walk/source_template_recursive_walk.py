@@ -25,6 +25,7 @@ from openplate.prompts.prompt_document import PromptInputTracker
 from openplate.cfg import template_config, project_config
 from openplate.cfg.open_plate_settings import OpenPlateSettings, OpenPlateRuntimeSettings
 from openplate.git import get_git_last_tag
+from openplate.project_metadata_resolver import resolve_template_source_metadata
 from openplate.sibling_template_resolver import render_sibling_template_config
 from openplate.shell_command_processor import process_command
 from openplate.util import str_to_bool
@@ -143,6 +144,9 @@ async def source_template_recursive_walk_single(
         except Exception:
             logging.debug(f"No Template Project config or other error (ok)")
 
+        if resolve_template_source_metadata(config_project_template, source):
+            project_config_changed = True
+
         # Answer questions:
         if project_config_resolver.resolve(
             settings,
@@ -158,8 +162,8 @@ async def source_template_recursive_walk_single(
             project_config_changed = True
 
         new_template_version = get_git_last_tag(source.folder_path())
-        if new_template_version and new_template_version != config_project.template_version:
-            config_project.template_version = new_template_version
+        if new_template_version and new_template_version != config_project_template.version:
+            config_project_template.version = new_template_version
             project_config_changed = True
 
         template_options = template_processor.compile_template_options(

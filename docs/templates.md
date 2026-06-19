@@ -54,19 +54,9 @@ ex:
     This is the project namespace: {{ project_namespace }}
 ```
 
-### Built-in Parameters
+### Built-in Template Variables
 
-These parameters exist when they are relevant:
-
-- `project_src_url` - If the project is init'd into a git repo, that repo url is available here
-- `project_repo_org` - If the project is init'd into a git repo, this is the repo organization
-- `project_repo_name` - If the project is init'd into a git repo, this is the repo name
-- `dest_folder` - the dest_folder as specified or assumed while doing the init
-- `project_folder_name` - the name of the folder where the project is being created (even when not on git), often matches the repo name
-- `template_src_url` - The url of the template being init'd/updated  (only if from a url, not if done via folder)
-- `template_version` - The version of the template bing init'd/updated
-- `project_guid[1-4]` - These are random guids created for this project to be used as desired by templates.  They are repo specific, not template specific.
-- `last_updater_email` - The email address of the last person to update the template on the project
+Built-in template variables, Git URL variants, runtime-only metadata rules, and deprecated compatibility aliases are documented in [docs/template-parameters.md](template-parameters.md).
 
 ### Default
 
@@ -81,10 +71,13 @@ parameters:
 
 In the above case, the question will only be asked once, and the default value will be used if the user does not specify a value.
 
-You can use liquid syntax and **SOME** variables in this property.  Only the built-in properties will be resolvable such as:
+You can use liquid syntax and **SOME** variables in this property. Only the built-in properties will be resolvable, such as:
 
 - dest_folder
 - project_folder_name
+- project_git_mode
+
+For the full built-in variable reference, including Git-scoped variables and deprecated aliases, see [docs/template-parameters.md](template-parameters.md).
 - Example:
   
   ```yaml

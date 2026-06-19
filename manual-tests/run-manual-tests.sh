@@ -108,6 +108,13 @@ PY
 }
 
 invoke_openplate() {
+  invoke_openplate_in_dir "$REPO_ROOT" "$@"
+}
+
+invoke_openplate_in_dir() {
+  local working_dir="$1"
+  shift
+
   local case_id="$1"
   local log_name="$2"
   local expected_codes_csv="$3"
@@ -127,9 +134,15 @@ invoke_openplate() {
 
   set +e
   if [[ -n "$stdin_file" ]]; then
-    env PYTHONPATH="$(python_module_search_path)" "$PYTHON_EXE" -m openplate "$@" < "$stdin_file" 2>&1 | tee "$log_path" >/dev/null
+    (
+      cd "$working_dir"
+      env PYTHONPATH="$(python_module_search_path)" "$PYTHON_EXE" -m openplate "$@" < "$stdin_file"
+    ) 2>&1 | tee "$log_path" >/dev/null
   else
-    env PYTHONPATH="$(python_module_search_path)" "$PYTHON_EXE" -m openplate "$@" 2>&1 | tee "$log_path" >/dev/null
+    (
+      cd "$working_dir"
+      env PYTHONPATH="$(python_module_search_path)" "$PYTHON_EXE" -m openplate "$@"
+    ) 2>&1 | tee "$log_path" >/dev/null
   fi
   exit_code=${PIPESTATUS[0]}
   set -e
@@ -196,12 +209,19 @@ reset_case_folders() {
 
 initialize_git_repo() {
   local repo_path="$1"
+  local remote_url="${2:-}"
   (
     cd "$repo_path"
     git init >/dev/null 2>&1
     git branch -M main >/dev/null 2>&1
     git config user.email 'manual-tests@example.com'
     git config user.name 'OpenPlate Manual Tests'
+    if ! find . -mindepth 1 -maxdepth 1 ! -name '.git' | grep -q .; then
+      printf 'manual test repo\n' > .manual-git-root
+    fi
+    if [[ -n "$remote_url" ]]; then
+      git remote add origin "$remote_url" >/dev/null 2>&1
+    fi
     git add .
     git commit -m 'fixture init' >/dev/null 2>&1
   )
@@ -321,21 +341,33 @@ run_case1() {
   local project_a="$case_work/bootstrap-project"
   local project_b="$case_work/default-branch-project"
   local project_c="$case_work/version-gated-project"
+  local git_project_root="$case_work/git-mode-project"
+  local git_invocation="$git_project_root/services/api"
   ensure_dir "$project_a"
   ensure_dir "$project_b"
   ensure_dir "$project_c"
+  ensure_dir "$git_invocation"
+  initialize_git_repo "$project_a"
+  initialize_git_repo "$project_b"
+  initialize_git_repo "$project_c"
 
   invoke_openplate "$case_id" '01-version.log' '0' '' --version >/dev/null
-  invoke_openplate "$case_id" '02-config-set.log' '0' '' -c "$(to_windows_path "$config_path")" config set --vcs-url "$repo_url" --template-prefix '?path=local-catalog' --parameter-default 'service_name=bootstrap-default' --parameter-default 'owner_name=platform-team' --allow-template-commands >/dev/null
+  invoke_openplate "$case_id" '02-config-set.log' '0' '' -c "$(to_windows_path "$config_path")" config set --parameter-default 'service_name=bootstrap-default' --parameter-default 'owner_name=platform-team' --allow-template-commands >/dev/null
   invoke_openplate "$case_id" '03-config-remove-default.log' '0' '' -c "$(to_windows_path "$config_path")" config set --parameter-default 'owner_name=' >/dev/null
   local config_log
   config_log="$(invoke_openplate "$case_id" '04-config-get.log' '0' '' -c "$(to_windows_path "$config_path")" config get)"
-  assert_file_contains "$config_log" 'vcs_url:'
-  assert_file_contains "$config_log" 'template_prefix:'
+  assert_file_contains "$config_log" 'allow_template_commands: true'
   assert_file_contains "$config_log" 'service_name: bootstrap-default'
   assert_file_not_contains "$config_log" 'owner_name: platform-team'
+  assert_file_not_contains "$config_log" 'vcs_url:'
+  assert_file_not_contains "$config_log" 'template_prefix:'
 
-  invoke_openplate "$case_id" '05-init-explicit-ref.log' '0' $'\n' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$project_a")" --dest-folder 'bootstrap/app' --no-cache "$source_with_ref" >/dev/null
+  local legacy_config_log
+  legacy_config_log="$(invoke_openplate "$case_id" '04b-config-set-legacy-source-settings-rejected.log' '2' '' -c "$(to_windows_path "$config_path")" config set --vcs-url "$repo_url" --template-prefix '?path=local-catalog')"
+  assert_file_contains "$legacy_config_log" 'unrecognized arguments: --vcs-url'
+  assert_file_contains "$legacy_config_log" '--template-prefix'
+
+  invoke_openplate "$case_id" '05-init-explicit-ref.log' '0' $'\n' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$project_a")" --dest-folder 'bootstrap/app' --no-cache "$source_with_ref" >/dev/null
 
   local managed_a="$project_a/scaffold/bootstrap/app/managed/service.txt"
   local docs_a="$project_a/scaffold/bootstrap/app/docs/bootstrap-default-overview.md"
@@ -346,11 +378,34 @@ run_case1() {
   assert_file_contains "$managed_a" 'deployment=lambda'
   assert_file_contains "$managed_a" 'instance=t3.small'
   assert_file_contains "$managed_a" 'hidden=hidden-default'
+  assert_file_contains "$managed_a" 'project_git_mode=true'
+  assert_file_contains "$managed_a" 'project_folder_name=bootstrap-project'
+  assert_file_contains "$managed_a" 'project_src_url='
+  assert_file_contains "$managed_a" 'project_git_repo_url='
+  assert_file_contains "$managed_a" 'project_git_ssh_repo_url='
+  assert_file_contains "$managed_a" 'project_git_https_repo_url='
+  assert_file_contains "$managed_a" 'project_git_repo_org='
+  assert_file_contains "$managed_a" 'project_git_repo_name='
+  assert_file_contains "$managed_a" 'project_repo_org='
+  assert_file_contains "$managed_a" 'project_repo_name='
+  assert_file_contains "$managed_a" "template_src_url=$source_with_ref"
+  assert_file_contains "$managed_a" 'template_git_ssh_src_url='
+  assert_file_contains "$managed_a" 'template_git_https_src_url='
+  assert_file_contains "$managed_a" 'template_git_repo_url='
+  assert_file_contains "$managed_a" 'template_git_repo_org='
+  assert_file_contains "$managed_a" 'template_git_repo_name='
+  assert_file_contains "$managed_a" 'template_git_repo_path='
+  assert_file_contains "$managed_a" 'template_git_repo_ref='
   assert_path_exists "$docs_a"
   assert_path_exists "$runbook_a"
   assert_file_contains "$hook_a" 'init command ran'
   assert_file_contains "$project_config_a" 'dest_folder: bootstrap/app'
   assert_file_contains "$project_config_a" 'no_cache: true'
+  assert_file_not_contains "$project_config_a" 'project_folder_name:'
+  assert_file_not_contains "$project_config_a" 'project_src_url:'
+  assert_file_not_contains "$project_config_a" 'project_repo_org:'
+  assert_file_not_contains "$project_config_a" 'project_repo_name:'
+  assert_file_not_contains "$project_config_a" 'project_git_repo_url:'
 
   clear_readonly_file "$managed_a"
   rm -f "$managed_a"
@@ -358,12 +413,12 @@ run_case1() {
   rm -f "$hook_a"
 
   local rerun_rejected_log
-  rerun_rejected_log="$(invoke_openplate "$case_id" '06-init-rerun-rejected.log' '1' '' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$project_a")" --dest-folder 'bootstrap/app' --no-cache "$source_with_ref")"
+  rerun_rejected_log="$(invoke_openplate "$case_id" '06-init-rerun-rejected.log' '1' '' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$project_a")" --dest-folder 'bootstrap/app' --no-cache "$source_with_ref")"
   assert_file_contains "$rerun_rejected_log" "Template already exists at destination folder 'bootstrap/app'"
   assert_path_missing "$managed_a"
   assert_path_missing "$docs_a"
 
-  invoke_openplate "$case_id" '07-init-overwrite.log' '0' '' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$project_a")" --overwrite --dest-folder 'bootstrap/app' --no-cache "$source_with_ref" >/dev/null
+  invoke_openplate "$case_id" '07-init-overwrite.log' '0' '' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$project_a")" --overwrite --dest-folder 'bootstrap/app' --no-cache "$source_with_ref" >/dev/null
 
   assert_file_contains "$managed_a" 'service=bootstrap-default'
   assert_file_contains "$docs_a" 'bootstrap-default'
@@ -385,22 +440,63 @@ PY
     exit 1
   fi
 
-  invoke_openplate "$case_id" '08-init-default-branch-and-ignore.log' '0' $'branchless-service\nlambda' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$project_b")" --allow-default-branch -i '.*runbook\.md' --dest-folder 'branchless/app' "$source_without_ref" >/dev/null
+  invoke_openplate "$case_id" '08-init-default-branch-and-ignore.log' '0' $'branchless-service\nlambda' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$project_b")" --allow-default-branch -i '.*runbook\.md' --dest-folder 'branchless/app' "$source_without_ref" >/dev/null
 
   local managed_b="$project_b/scaffold/branchless/app/managed/service.txt"
   local runbook_b="$project_b/scaffold/branchless/app/notes/runbook.md"
   assert_file_contains "$managed_b" 'service=branchless-service'
   assert_path_missing "$runbook_b"
 
-  invoke_openplate "$case_id" '09-init-ignore-tool-version.log' '0' '' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$project_c")" --ignore-tool-version "$gated_source" >/dev/null
+  invoke_openplate "$case_id" '09-init-ignore-tool-version.log' '0' '' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$project_c")" --ignore-tool-version "$gated_source" >/dev/null
   assert_path_exists "$project_c/gated/info.txt"
+
+  write_utf8_no_bom "$git_project_root/.manual-git-root" $'git mode manual project\n'
+  initialize_git_repo "$git_project_root" 'https://user:pass@github.com/manual-org/manual-service.git'
+
+  invoke_openplate_in_dir "$git_invocation" "$case_id" '10-init-git-mode-default-dest.log' '0' $'\n' -c "$(to_windows_path "$config_path")" init "$source_with_ref" >/dev/null
+
+  local managed_git="$git_project_root/scaffold/services/api/managed/service.txt"
+  local hook_git="$git_project_root/hooks/init-command.txt"
+  local nested_hook_git="$git_invocation/hooks/init-command.txt"
+  local project_config_git="$git_project_root/.openplate.project.yaml"
+  assert_file_contains "$managed_git" 'project_git_mode=true'
+  assert_file_contains "$managed_git" 'project_folder_name=manual-service'
+  assert_file_contains "$managed_git" 'project_src_url=https://github.com/manual-org/manual-service.git'
+  assert_file_contains "$managed_git" 'project_git_repo_url=https://github.com/manual-org/manual-service.git'
+  assert_file_contains "$managed_git" 'project_git_ssh_repo_url=git@github.com:manual-org/manual-service.git'
+  assert_file_contains "$managed_git" 'project_git_https_repo_url=https://github.com/manual-org/manual-service.git'
+  assert_file_contains "$managed_git" 'project_git_repo_org=manual-org'
+  assert_file_contains "$managed_git" 'project_git_repo_name=manual-service'
+  assert_file_contains "$managed_git" 'project_repo_org=manual-org'
+  assert_file_contains "$managed_git" 'project_repo_name=manual-service'
+  assert_file_contains "$managed_git" "template_src_url=$source_with_ref"
+  assert_file_contains "$managed_git" 'template_git_ssh_src_url='
+  assert_file_contains "$managed_git" 'template_git_https_src_url='
+  assert_file_contains "$managed_git" 'template_git_repo_url='
+  assert_file_contains "$managed_git" 'template_git_repo_org='
+  assert_file_contains "$managed_git" 'template_git_repo_name='
+  assert_file_contains "$managed_git" 'template_git_repo_path='
+  assert_file_contains "$managed_git" 'template_git_repo_ref='
+  assert_path_exists "$hook_git"
+  assert_path_missing "$nested_hook_git"
+  assert_file_contains "$project_config_git" 'dest_folder: services/api'
+  assert_file_not_contains "$project_config_git" 'project_folder_name:'
+  assert_file_not_contains "$project_config_git" 'project_src_url:'
+  assert_file_not_contains "$project_config_git" 'project_repo_org:'
+  assert_file_not_contains "$project_config_git" 'project_repo_name:'
+  assert_file_not_contains "$project_config_git" 'project_git_repo_url:'
+
+  local invalid_root_log
+  invalid_root_log="$(invoke_openplate "$case_id" '11-init-invalid-git-subroot.log' '1' '' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$git_invocation")" "$source_with_ref")"
+  assert_file_contains "$invalid_root_log" 'Explicit project roots inside Git must use the Git top-level folder'
 
   write_summary "$case_id" \
     "Catalog repo: $repo_path" \
     "Explicit ref source: $source_with_ref" \
     "Default branch source: $source_without_ref" \
     "Version-gated source: $gated_source" \
-    'Validated config persistence, file:// sources, ?path= selection, #main refs, --allow-default-branch, --dest-folder, --no-cache, --ignore, init rerun rejection, init --overwrite behavior, and --ignore-tool-version.'
+    "Git-mode project remote: https://github.com/manual-org/manual-service.git" \
+    'Validated config persistence, removed source-resolution settings, file:// sources, ?path= selection, #main refs, --project-root, Git-mode default dest-folder inference, project-file runtime metadata omission, sanitized HTTPS project metadata, non-Git template metadata emptiness, --allow-default-branch, explicit --dest-folder, --no-cache, --ignore, init rerun rejection, init --overwrite behavior, invalid explicit Git sub-root rejection, and --ignore-tool-version.'
 }
 
 run_case2() {
@@ -421,9 +517,12 @@ run_case2() {
   ensure_dir "$blocked_project"
   ensure_dir "$default_project"
   ensure_dir "$hidden_project"
+  initialize_git_repo "$blocked_project"
+  initialize_git_repo "$default_project"
+  initialize_git_repo "$hidden_project"
 
   local blocked_log
-  blocked_log="$(invoke_openplate "$case_id" '01-blocked-init-commands.log' '1' '' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$blocked_project")" "$source_url")"
+  blocked_log="$(invoke_openplate "$case_id" '01-blocked-init-commands.log' '1' '' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$blocked_project")" "$source_url")"
   assert_file_contains "$blocked_log" 'Template init_commands require confirmation'
   assert_file_contains "$blocked_log" 'This template defines init_commands that would run later:'
   assert_file_contains "$blocked_log" '--allow-template-commands'
@@ -431,7 +530,7 @@ run_case2() {
 
   invoke_openplate "$case_id" '02-config-allow-init-commands.log' '0' '' -c "$(to_windows_path "$config_path")" config set --allow-template-commands >/dev/null
 
-  invoke_openplate "$case_id" '03-init-with-default-hidden.log' '0' $'interactive-default\nlambda' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$default_project")" --dest-folder 'interactive/default' "$source_url" >/dev/null
+  invoke_openplate "$case_id" '03-init-with-default-hidden.log' '0' $'interactive-default\nlambda' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$default_project")" --dest-folder 'interactive/default' "$source_url" >/dev/null
   local managed_default="$default_project/scaffold/interactive/default/managed/service.txt"
   assert_file_contains "$managed_default" 'service=interactive-default'
   assert_file_contains "$managed_default" 'deployment=lambda'
@@ -439,7 +538,7 @@ run_case2() {
   assert_file_contains "$managed_default" 'hidden=hidden-default'
   assert_path_exists "$default_project/hooks/init-command.txt"
 
-  invoke_openplate "$case_id" '04-init-with-ask-hidden.log' '0' $'interactive-ec2\nec2\nm5.large\noverride-secret' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$hidden_project")" --ask-hidden --dest-folder 'interactive/hidden' "$source_url" >/dev/null
+  invoke_openplate "$case_id" '04-init-with-ask-hidden.log' '0' $'interactive-ec2\nec2\nm5.large\noverride-secret' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$hidden_project")" --ask-hidden --dest-folder 'interactive/hidden' "$source_url" >/dev/null
   local managed_hidden="$hidden_project/scaffold/interactive/hidden/managed/service.txt"
   assert_file_contains "$managed_hidden" 'service=interactive-ec2'
   assert_file_contains "$managed_hidden" 'deployment=ec2'
@@ -470,6 +569,9 @@ run_case3() {
   ensure_dir "$export_project"
   ensure_dir "$file_import_project"
   ensure_dir "$stdin_import_project"
+  initialize_git_repo "$export_project"
+  initialize_git_repo "$file_import_project"
+  initialize_git_repo "$stdin_import_project"
 
   local artifact_dir="$ARTIFACTS_ROOT/$case_id"
   local compact_path="$artifact_dir/prompts-compact.json"
@@ -477,12 +579,12 @@ run_case3() {
   local file_import_path="$artifact_dir/prompts-import-file.json"
   local stdin_import_path="$artifact_dir/prompts-import-stdin.json"
 
-  invoke_openplate "$case_id" '01-print-init-json-compact.log' '0' '' -c "$(to_windows_path "$config_path")" project --project-folder "$(to_windows_path "$export_project")" print-init-json "$source_url" >/dev/null
+  invoke_openplate "$case_id" '01-print-init-json-compact.log' '0' '' -c "$(to_windows_path "$config_path")" project --project-root "$(to_windows_path "$export_project")" print-init-json "$source_url" >/dev/null
   cp "$artifact_dir/01-print-init-json-compact.log" "$compact_path"
   assert_path_missing "$export_project/.openplate.project.yaml"
   assert_file_not_contains "$compact_path" '"info"'
 
-  invoke_openplate "$case_id" '02-print-init-json-verbose.log' '0' '' -c "$(to_windows_path "$config_path")" project --project-folder "$(to_windows_path "$export_project")" --ask-hidden print-init-json "$source_url" --verbose >/dev/null
+  invoke_openplate "$case_id" '02-print-init-json-verbose.log' '0' '' -c "$(to_windows_path "$config_path")" project --project-root "$(to_windows_path "$export_project")" --ask-hidden print-init-json "$source_url" --verbose >/dev/null
   cp "$artifact_dir/02-print-init-json-verbose.log" "$verbose_path"
   assert_file_contains "$verbose_path" '"info"'
   assert_file_contains "$verbose_path" '"hidden_name"'
@@ -491,7 +593,7 @@ run_case3() {
   build_case3_stdin_import_json "$compact_path" "$stdin_import_path"
 
   local file_import_log
-  file_import_log="$(invoke_openplate "$case_id" '03-init-prompts-json-file.log' '0' '' -d -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$file_import_project")" --ask-hidden --dest-folder 'imported/root' "$source_url" --prompts-json-file "$(to_windows_path "$file_import_path")")"
+  file_import_log="$(invoke_openplate "$case_id" '03-init-prompts-json-file.log' '0' '' -d -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$file_import_project")" --ask-hidden --dest-folder 'imported/root' "$source_url" --prompts-json-file "$(to_windows_path "$file_import_path")")"
   assert_file_contains "$file_import_log" 'Ignoring supplied prompt template because it was not processed'
   assert_file_contains "$file_import_log" 'Ignoring unused supplied prompt parameter'
   assert_file_contains "$file_import_project/generated/imported/root/managed/root.txt" 'service=json-file-service'
@@ -500,7 +602,7 @@ run_case3() {
 
   local stdin_payload
   stdin_payload="$(cat "$stdin_import_path")"
-  invoke_openplate "$case_id" '04-init-prompts-json-stdin.log' '0' "$stdin_payload" -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$stdin_import_project")" --dest-folder 'stdin/root' "$source_url" --prompts-json-stdin >/dev/null
+  invoke_openplate "$case_id" '04-init-prompts-json-stdin.log' '0' "$stdin_payload" -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$stdin_import_project")" --dest-folder 'stdin/root' "$source_url" --prompts-json-stdin >/dev/null
   assert_file_contains "$stdin_import_project/generated/stdin/root/managed/root.txt" 'service=json-stdin-service'
   assert_path_missing "$stdin_import_project/generated/worker/json-stdin-service/managed/worker.txt"
 
@@ -524,8 +626,9 @@ run_case4() {
   local config_path="$case_work/openplate-config.yaml"
   local project_path="$case_work/update-project"
   ensure_dir "$project_path"
+  initialize_git_repo "$project_path"
 
-  invoke_openplate "$case_id" '01-init.log' '0' $'update-demo\nlambda' -c "$(to_windows_path "$config_path")" init --project-folder "$(to_windows_path "$project_path")" --allow-template-commands --dest-folder 'update/app' "$source_url" >/dev/null
+  invoke_openplate "$case_id" '01-init.log' '0' $'update-demo\nlambda' -c "$(to_windows_path "$config_path")" init --project-root "$(to_windows_path "$project_path")" --allow-template-commands --dest-folder 'update/app' "$source_url" >/dev/null
 
   local managed_path="$project_path/scaffold/update/app/managed/service.txt"
   local docs_path="$project_path/scaffold/update/app/docs/update-demo-overview.md"
@@ -536,23 +639,30 @@ run_case4() {
   rm -f "$runbook_path"
 
   local verify_fail_log
-  verify_fail_log="$(invoke_openplate "$case_id" '02-verify-before-update.log' '1' '' -c "$(to_windows_path "$config_path")" project --project-folder "$(to_windows_path "$project_path")" verify)"
+  verify_fail_log="$(invoke_openplate "$case_id" '02-verify-before-update.log' '1' '' -c "$(to_windows_path "$config_path")" project --project-root "$(to_windows_path "$project_path")" verify)"
   assert_file_contains "$verify_fail_log" 'Running verify on folder:'
 
-  invoke_openplate "$case_id" '03-update-missing.log' '0' $'update-demo\nlambda' -c "$(to_windows_path "$config_path")" update --project-folder "$(to_windows_path "$project_path")" --ask-again --update-missing >/dev/null
+  invoke_openplate "$case_id" '03-update-missing.log' '0' $'update-demo\nlambda' -c "$(to_windows_path "$config_path")" update --project-root "$(to_windows_path "$project_path")" --ask-again --update-missing >/dev/null
   assert_file_contains "$managed_path" 'service=update-demo'
   assert_file_contains "$runbook_path" 'Runbook for update-demo.'
   assert_file_contains "$docs_path" '# drifted non-readonly file'
 
-  invoke_openplate "$case_id" '04-update-full.log' '0' '' -c "$(to_windows_path "$config_path")" update --project-folder "$(to_windows_path "$project_path")" --update-full >/dev/null
+  invoke_openplate "$case_id" '04-update-full.log' '0' '' -c "$(to_windows_path "$config_path")" update --project-root "$(to_windows_path "$project_path")" --update-full >/dev/null
   assert_file_contains "$docs_path" '# update-demo'
 
+  local project_config_path="$project_path/.openplate.project.yaml"
+  assert_file_not_contains "$project_config_path" 'project_folder_name:'
+  assert_file_not_contains "$project_config_path" 'project_src_url:'
+  assert_file_not_contains "$project_config_path" 'project_repo_org:'
+  assert_file_not_contains "$project_config_path" 'project_repo_name:'
+  assert_file_not_contains "$project_config_path" 'project_git_repo_url:'
+
   local verify_pass_log
-  verify_pass_log="$(invoke_openplate "$case_id" '05-verify-after-update.log' '0' '' -c "$(to_windows_path "$config_path")" project --project-folder "$(to_windows_path "$project_path")" verify)"
+  verify_pass_log="$(invoke_openplate "$case_id" '05-verify-after-update.log' '0' '' -c "$(to_windows_path "$config_path")" project --project-root "$(to_windows_path "$project_path")" verify)"
   assert_file_contains "$verify_pass_log" 'Done!'
 
   local automation_verify_log
-  automation_verify_log="$(invoke_openplate "$case_id" '06-verify-automation.log' '0' '' -a -c "$(to_windows_path "$config_path")" project --project-folder "$(to_windows_path "$project_path")" verify)"
+  automation_verify_log="$(invoke_openplate "$case_id" '06-verify-automation.log' '0' '' -a -c "$(to_windows_path "$config_path")" project --project-root "$(to_windows_path "$project_path")" verify)"
   assert_file_not_contains "$automation_verify_log" 'Running verify on folder:'
 
   write_summary "$case_id" \

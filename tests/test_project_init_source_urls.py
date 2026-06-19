@@ -38,6 +38,9 @@ def _create_git_repo(repo_path: Path):
     subprocess.run(["git", "branch", "-M", "main"], cwd=repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
     subprocess.run(["git", "config", "user.email", "tests@example.com"], cwd=repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
     subprocess.run(["git", "config", "user.name", "OpenPlate Tests"], cwd=repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
+    tracked_entries = [entry for entry in repo_path.iterdir() if entry.name != ".git"]
+    if not tracked_entries:
+        (repo_path / "README.md").write_text("repo\n", encoding="utf-8")
     subprocess.run(["git", "add", "."], cwd=repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
     subprocess.run(["git", "commit", "-m", "init"], cwd=repo_path, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8")
 
@@ -54,38 +57,45 @@ def test_create_arg_parser_accepts_positional_source_url():
 
 
 def test_create_arg_parser_accepts_top_level_init_with_shared_project_options():
-    args = ["openplate", "init", "--project-folder", "workspace", "--ask-hidden", "https://example.com/template.git#main"]
+    args = ["openplate", "init", "--project-root", "workspace", "--ask-hidden", "https://example.com/template.git#main"]
     parser = create_arg_parser(args)
 
     result = parser.parse_args(args[1:])
 
     assert result.command == "project-init"
-    assert result.project_folder == "workspace"
+    assert result.project_root == "workspace"
     assert result.ask_hidden is True
     assert result.source == "https://example.com/template.git#main"
 
 
 def test_create_arg_parser_accepts_top_level_update_with_shared_project_options():
-    args = ["openplate", "update", "--project-folder", "workspace", "--ask-again", "--update-full"]
+    args = ["openplate", "update", "--project-root", "workspace", "--ask-again", "--update-full"]
     parser = create_arg_parser(args)
 
     result = parser.parse_args(args[1:])
 
     assert result.command == "project-update"
-    assert result.project_folder == "workspace"
+    assert result.project_root == "workspace"
     assert result.ask_again is True
     assert result.update_full is True
 
 
 def test_create_arg_parser_accepts_legacy_project_update_with_shared_project_options():
-    args = ["openplate", "project", "--project-folder", "workspace", "update", "--update-full"]
+    args = ["openplate", "project", "--project-root", "workspace", "update", "--update-full"]
     parser = create_arg_parser(args)
 
     result = parser.parse_args(args[1:])
 
     assert result.command == "project-update"
-    assert result.project_folder == "workspace"
+    assert result.project_root == "workspace"
     assert result.update_full is True
+
+
+def test_create_arg_parser_rejects_legacy_project_folder_option():
+    parser = create_arg_parser(["openplate", "init"])
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["init", "--project-folder", "workspace", "https://example.com/template.git#main"])
 
 
 def test_create_arg_parser_top_level_help_hides_project_command():
@@ -198,7 +208,7 @@ def test_async_main_warns_when_using_legacy_r_flag(monkeypatch, capsys, tmp_path
         "-c",
         str(tmp_path / "missing-config.yaml"),
         "project",
-        "--project-folder",
+        "--project-root",
         str(tmp_path),
         "init",
         "-r",
@@ -228,7 +238,7 @@ def test_async_main_passes_prompt_document_to_project_init(monkeypatch, tmp_path
         "-c",
         str(tmp_path / "missing-config.yaml"),
         "project",
-        "--project-folder",
+        "--project-root",
         str(tmp_path),
         "init",
         "https://example.com/template.git#main",
@@ -257,7 +267,7 @@ def test_async_main_dispatches_print_init_json(monkeypatch, tmp_path):
         "-c",
         str(tmp_path / "missing-config.yaml"),
         "project",
-        "--project-folder",
+        "--project-root",
         str(tmp_path),
         "print-init-json",
         "https://example.com/template.git#main",
@@ -269,6 +279,56 @@ def test_async_main_dispatches_print_init_json(monkeypatch, tmp_path):
     assert captured_options["template"].src_url == "https://example.com/template.git#main"
     assert captured_options["destination"] == str(tmp_path.resolve())
     assert captured_options["verbose"] is True
+
+
+def test_async_main_uses_git_top_level_root_and_invocation_relative_dest(monkeypatch, tmp_path):
+    captured_options = {}
+
+    async def fake_run(_settings, _runtime_settings, options):
+        captured_options["destination"] = options.destination
+        captured_options["dest_folder"] = options.add_template.dest_folder
+
+    monkeypatch.setattr("openplate.commands.project_init.run", fake_run)
+
+    repo_path = tmp_path / "repo"
+    _create_git_repo(repo_path)
+    invocation_folder = repo_path / "services" / "api"
+    invocation_folder.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(invocation_folder)
+
+    args = [
+        "openplate",
+        "-c",
+        str(tmp_path / "missing-config.yaml"),
+        "init",
+        "https://example.com/template.git#main",
+    ]
+
+    asyncio.run(async_main(args))
+
+    assert captured_options["destination"] == str(repo_path.resolve())
+    assert captured_options["dest_folder"] == "services/api"
+
+
+def test_async_main_rejects_explicit_git_subfolder_project_root(monkeypatch, tmp_path):
+    repo_path = tmp_path / "repo"
+    _create_git_repo(repo_path)
+    invocation_folder = repo_path / "services" / "api"
+    invocation_folder.mkdir(parents=True, exist_ok=True)
+    monkeypatch.chdir(invocation_folder)
+
+    args = [
+        "openplate",
+        "-c",
+        str(tmp_path / "missing-config.yaml"),
+        "init",
+        "--project-root",
+        str(invocation_folder),
+        "https://example.com/template.git#main",
+    ]
+
+    with pytest.raises(ValueError, match="Git top-level folder"):
+        asyncio.run(async_main(args))
 
 
 def test_git_template_reference_parses_query_path_and_ref():

@@ -23,6 +23,28 @@ from typing import Optional, Any
 import yaml
 
 
+def _to_serializable_data(value):
+    if value is None or isinstance(value, (str, int, float, bool, bytes)):
+        return value
+
+    if isinstance(value, dict):
+        return {
+            _to_serializable_data(key): _to_serializable_data(item)
+            for key, item in value.items()
+        }
+
+    if isinstance(value, list):
+        return [_to_serializable_data(item) for item in value]
+
+    if isinstance(value, tuple):
+        return tuple(_to_serializable_data(item) for item in value)
+
+    if hasattr(value, "__getstate__") and type(value).__module__ != "builtins":
+        return _to_serializable_data(value.__getstate__())
+
+    return value
+
+
 def raw_from_file(file_name: str) -> str:
     if file_name is None:
         raise TypeError
@@ -72,11 +94,12 @@ def to_file(data: object, file_name: str):
 
     try:
         real_file = os.path.expanduser(file_name)
+        serializable_data = _to_serializable_data(data)
 
         # not sure how to get clean yaml without this:
         yaml.emitter.Emitter.prepare_tag = lambda self, tag: ''
         with open(real_file, "w") as file:
-            yaml.dump(data, file)
+            yaml.dump(serializable_data, file)
 
         logging.debug(f"Yaml file written: {file_name}")
     except Exception as e:
@@ -87,7 +110,7 @@ def to_file(data: object, file_name: str):
 def to_string(self):
     # not sure how to get clean yaml without this:
     yaml.emitter.Emitter.prepare_tag = lambda self, tag: ''
-    return yaml.dump(self)
+    return yaml.dump(_to_serializable_data(self))
 
 
 def deserialize_string_list(data, field_name: str):

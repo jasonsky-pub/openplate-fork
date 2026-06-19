@@ -42,26 +42,32 @@ The matrix below accounts for the current visible CLI surface from [docs/command
 | --- | --- | --- |
 | Global `--version` | `manual:case-1` | The runner records CLI version output before any case-specific setup. |
 | Global `--config-file` | `manual:case-1` | Every case uses a case-local config file so global settings stay isolated. |
-| Global `--project-folder` | `manual:case-1` | Every init, update, and verify run targets an explicit disposable project folder. |
+| Global `--project-root` | `manual:case-1` | The runner uses explicit project roots for init, update, and verify, and Case 1 also validates the Git-top-level restriction for explicit roots. |
 | Global `--ask-hidden` | `manual:case-2` | Case 2 compares default hidden behavior with an explicit `--ask-hidden` run. |
 | Global `--ask-again` | `manual:case-4` | Case 4 reruns update with `--ask-again` to force parameter prompting during maintenance. |
 | Global `--ignore-tool-version` | `manual:case-1` | Case 1 initializes a fixture that requires `--ignore-tool-version` to bypass a synthetic tool gate. |
 | Global `--debug` | `manual:case-3` | Case 3 enables debug logging on file import so ignored-node and unused-answer warnings are captured. |
 | Global `--automation` | `manual:case-4` | Case 4 runs `project verify` in automation mode after repair and validates the machine-readable output shape. |
-| `config get` | `manual:case-1` | Case 1 captures and validates persisted config output. |
-| `config set --vcs-url` | `manual:case-1` | Case 1 persists a case-local local-catalog URL. |
-| `config set --template-prefix` | `manual:case-1` | Case 1 persists and validates a template-prefix value in config output. |
+| `config get` | `manual:case-1` | Case 1 captures config output and validates that removed source-resolution settings are omitted. |
+| `config set` removed source-resolution settings | `manual:case-1` | Case 1 explicitly proves `--vcs-url` and `--template-prefix` are rejected. |
 | `config set --parameter-default` add | `manual:case-1` | Case 1 adds a `service_name` default and uses it during init. |
 | `config set --parameter-default` remove | `manual:case-1` | Case 1 removes an `owner_name` default and validates that it disappears from config output. |
 | `config set --allow-template-commands` | `manual:case-2` | Case 2 toggles the persistent template-command setting after first showing the blocked behavior. |
+| Project-file omission of runtime-derived project metadata | `manual:case-1` | Case 1 and Case 4 validate that project config writes omit runtime-only project metadata fields. |
 | `init` top-level command | `manual:case-1` | Case 1 uses the documented top-level init entrypoint throughout. |
 | `init` positional source URL | `manual:case-1` | All init runs use the positional source form. |
 | `init` `file://` transport | `manual:case-1` | The full seeded suite uses only local file-backed git repos. |
-| `init` HTTPS transport syntax | `excluded` | Repo-owned manual cases are intentionally offline and local-only. Network URL syntax stays documented but not executed here. |
+| `init` HTTPS transport syntax | `excluded` | Repo-owned manual cases are intentionally offline and local-only. Network template URLs stay documented but are not fetched here. |
 | `init` SSH/scp transport syntax | `excluded` | Repo-owned manual cases are intentionally offline and local-only. Network URL syntax stays documented but not executed here. |
+| Sanitized HTTPS project metadata | `manual:case-1` | Case 1 seeds a local Git project root with an HTTPS remote containing credentials and validates the sanitized runtime values and alternate SSH form. |
 | `init` `?path=` template sub-folder selection | `manual:case-1` | Case 1 selects templates from a local catalog repo by sub-folder. |
 | `init` explicit `#branch-or-tag` ref | `manual:case-1` | Case 1 uses `#main` on local catalog sources. |
+| Preserved template `#ref` semantics | `manual:case-1` | Case 1 validates that the rendered template source reference still includes the explicit `#main` suffix. |
+| Non-Git template URL metadata emptiness | `manual:case-1` | Case 1 validates that local `file://` template sources leave all `template_git_*` values empty. |
+| Deprecated Liquid alias availability | `manual:case-1` | Case 1 validates that `project_repo_org` and `project_repo_name` still mirror the new Git-scoped values. |
 | `init --allow-default-branch` | `manual:case-1` | Case 1 initializes a branchless local source successfully only when the flag is supplied. |
+| Invalid explicit Git subfolder `--project-root` handling | `manual:case-1` | Case 1 asserts the focused migration error for explicit project roots that point at a Git subfolder rather than the Git top-level folder. |
+| Git-mode default `dest_folder` resolution | `manual:case-1` | Case 1 runs init from a Git subfolder without `--dest-folder` and validates output under the invocation-relative path. |
 | `init --dest-folder` | `manual:case-1` | Case 1 and Case 3 both materialize generated files under dest-folder-dependent scaffold segments. |
 | `init --no-cache` | `manual:case-1` | Case 1 validates `no_cache: true` in the generated project config. |
 | `init --ignore` | `manual:case-1` | Case 1 filters the runbook file and validates that it is absent. |
@@ -85,6 +91,7 @@ The matrix below accounts for the current visible CLI surface from [docs/command
 | `project verify` | `manual:case-4` | Case 4 validates both failing and passing verify runs. |
 | Legacy `project init` command path | `automated-only` | Compatibility entrypoints remain covered by focused parser/runtime tests. |
 | Legacy `project update` command path | `automated-only` | Compatibility entrypoints remain covered by focused parser/runtime tests. |
+| Removed `--project-folder` parser behavior | `automated-only` | Focused parser tests cover the rejection message for the renamed root flag. |
 | Legacy or removed init flags such as `-n/--name` and `-f/--folder` | `automated-only` | Rejection behavior is a parser contract that is already covered by targeted tests. |
 | Removed init print flag and removed update prompt JSON flags | `automated-only` | Rejection behavior is covered by targeted parser tests and is not a meaningful manual operator workflow. |
 

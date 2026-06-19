@@ -23,10 +23,8 @@ from openplate.cfg.open_plate_settings import OpenPlateSettings
 
 
 class ConfigSetOptions:
-    def __init__(self, config_file, vcs_url, template_prefix, defaults, allow_template_commands):
+    def __init__(self, config_file, defaults, allow_template_commands):
         self.config_file = config_file
-        self.vcs_url = vcs_url
-        self.template_prefix = template_prefix
         self.defaults = defaults or {}
         self.allow_template_commands = allow_template_commands
 
@@ -43,8 +41,8 @@ async def run(settings: OpenPlateSettings, options: ConfigSetOptions):
             del merged_defaults[key]
 
     newConfiguration = OpenPlateSettings(
-        options.vcs_url or settings.vcs_url or open_plate_settings.defaultSettings.vcs_url,
-        options.template_prefix or settings.template_prefix or open_plate_settings.defaultSettings.template_prefix,
+        settings.vcs_url or open_plate_settings.defaultSettings.vcs_url,
+        settings.template_prefix or open_plate_settings.defaultSettings.template_prefix,
         merged_defaults,
         settings.allow_template_commands if options.allow_template_commands is None else options.allow_template_commands
     )

@@ -10,7 +10,7 @@
 Matrix facets covered by this case:
 
 - `global --config-file`
-- `global --project-folder`
+- `global --project-root`
 - `global --ask-hidden`
 - `config set --allow-template-commands`
 - `init interactive prompting`
