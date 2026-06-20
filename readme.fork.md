@@ -6,16 +6,38 @@ This fork publishes:
 - Installed CLI command: `openplate`
 - Docker image: `jasonskypub/jsopfork`
 
-## Release variables
+## Choose and set the release version
+
+Check the current published PyPI version and the local source version before choosing the next release:
 
 ```bash
-export VERSION=0.0.1
-export IMAGE=jasonskypub/jsopfork
+cd /run/media/private/skyzero/random/local/jasonsky-pub/openplate-fork
+
+python - <<'PY'
+import json
+import urllib.request
+from pathlib import Path
+
+with urllib.request.urlopen("https://pypi.org/pypi/jsopfork/json", timeout=20) as r:
+    data = json.load(r)
+
+print("latest_pypi_version =", data["info"]["version"])
+print("all_pypi_versions =", ", ".join(sorted(data.get("releases", {}))))
+
+for line in Path("src/openplate/__init__.py").read_text(encoding="utf-8").splitlines():
+    if line.startswith("__version__ = "):
+        print("local_source_version =", line.split("=", 1)[1].strip().strip('"'))
+        break
+PY
 ```
 
-## Build the Python package
+Then set the next release version and update the source version before building.
+This version edit is temporary release state only: build from it, then restore it, and do not commit it.
 
 ```bash
+export VERSION=X.Y.Z
+export IMAGE=jasonskypub/jsopfork
+
 python - <<'PY'
 from pathlib import Path
 import os
@@ -28,11 +50,19 @@ text = re.sub(r'__version__ = "[^"]+"', f'__version__ = "{version}"', text)
 text = re.sub(r'__semver__ = "[^"]+"', f'__semver__ = "{version}"', text)
 path.write_text(text, encoding="utf-8")
 PY
+```
+
+## Build the Python package
+
+```bash
 rm -rf dist build *.egg-info
 python -m pip install --upgrade build twine
 python -m build
 python -m twine check dist/*
 ls -1 dist/
+
+# Do not commit the temporary version change used for the package build.
+git restore src/openplate/__init__.py
 ```
 
 ## Publish the Python package to PyPI
