@@ -5,6 +5,7 @@
 - `openplate --version`
 - `openplate config set`
 - `openplate config get`
+- `openplate config set --allow-last-updater-email`
 - `openplate init` with `file://` sources, `?path=`, `#main`, `--project-root`, inferred Git-mode `dest_folder`, `--allow-default-branch`, `--dest-folder`, `--no-cache`, `--ignore`, rerun rejection, `--overwrite`, and `--ignore-tool-version`
 
 Matrix facets covered by this case:
@@ -15,6 +16,7 @@ Matrix facets covered by this case:
 - `global --ignore-tool-version`
 - `config get`
 - `config set --parameter-default add/remove`
+- `config set --allow-last-updater-email`
 - `config set --allow-template-commands`
 - `config set` rejects removed `--vcs-url` and `--template-prefix`
 - `init positional source URL`
@@ -49,7 +51,7 @@ bash ./manual-tests/run-manual-tests.sh case-1
 ## Expected Scripted Outputs
 
 - [manual-tests/artifacts/case-1/01-version.log](manual-tests/artifacts/case-1/01-version.log) records the CLI version output.
-- [manual-tests/artifacts/case-1/04-config-get.log](manual-tests/artifacts/case-1/04-config-get.log) shows the retained `service_name` default and `allow_template_commands: true` while omitting removed source-resolution settings.
+- [manual-tests/artifacts/case-1/04-config-get.log](manual-tests/artifacts/case-1/04-config-get.log) shows the retained `service_name` default, `allow_template_commands: true`, and `allow_last_updater_email: true` while omitting removed source-resolution settings.
 - [manual-tests/artifacts/case-1/04b-config-set-legacy-source-settings-rejected.log](manual-tests/artifacts/case-1/04b-config-set-legacy-source-settings-rejected.log) records that `config set --vcs-url` and `config set --template-prefix` are rejected as unsupported arguments.
 - [manual-tests/artifacts/case-1/summary.txt](manual-tests/artifacts/case-1/summary.txt) lists the materialized local catalog repo and the source URLs used.
 - [manual-tests/work/case-1/bootstrap-project/.openplate.project.yaml](manual-tests/work/case-1/bootstrap-project/.openplate.project.yaml) contains `dest_folder: bootstrap/app` and `no_cache: true` while omitting runtime-derived project metadata fields.
@@ -65,7 +67,7 @@ bash ./manual-tests/run-manual-tests.sh case-1
 ## Manual Validation Checklist
 
 - Confirm the recorded source URLs in [manual-tests/artifacts/case-1/summary.txt](manual-tests/artifacts/case-1/summary.txt) are local `file://` URLs only.
-- Confirm [manual-tests/work/case-1/openplate-config.yaml](manual-tests/work/case-1/openplate-config.yaml) and [manual-tests/artifacts/case-1/04-config-get.log](manual-tests/artifacts/case-1/04-config-get.log) omit `vcs_url` and `template_prefix` while retaining the parameter default and template-command setting.
+- Confirm [manual-tests/work/case-1/openplate-config.yaml](manual-tests/work/case-1/openplate-config.yaml) and [manual-tests/artifacts/case-1/04-config-get.log](manual-tests/artifacts/case-1/04-config-get.log) omit `vcs_url` and `template_prefix` while retaining the parameter default, template-command setting, and `allow_last_updater_email: true`.
 - Confirm the bootstrap project created [manual-tests/work/case-1/bootstrap-project/hooks/init-command.txt](manual-tests/work/case-1/bootstrap-project/hooks/init-command.txt), showing the persisted `config set --allow-template-commands` setting took effect.
 - Confirm the plain rerun log rejects the second `init` attempt for the same dest-folder and leaves the removed bootstrap files absent.
 - Confirm the overwrite rerun restored the removed bootstrap files but did not recreate [manual-tests/work/case-1/bootstrap-project/hooks/init-command.txt](manual-tests/work/case-1/bootstrap-project/hooks/init-command.txt), demonstrating that `init --overwrite` skips init-command reruns.

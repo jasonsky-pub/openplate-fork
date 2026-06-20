@@ -71,6 +71,7 @@ class ProjectTemplateConfig:
         raw_template_reference: Optional[str] = None,
         raw_dest_folder = _RAW_DEST_FOLDER_UNSET,
         raw_condition: Optional[str] = None,
+        requires_last_updater_email: bool = False,
     ):
         self.src_url = src_url
         self.src_name = src_name
@@ -97,9 +98,10 @@ class ProjectTemplateConfig:
         self.parameters = parameters
         self.template_ignore_paths = template_ignore_paths
         self.no_cache = no_cache
+        self.requires_last_updater_email = requires_last_updater_email
 
     def __getstate__(self):
-        return {
+        result = {
             "src_url": self.src_url,
             "dest_folder": self.dest_folder,
             "version": self.version,
@@ -107,6 +109,9 @@ class ProjectTemplateConfig:
             "template_ignore_paths": self.template_ignore_paths,
             "no_cache": self.no_cache,
         }
+        if self.requires_last_updater_email:
+            result["requires_last_updater_email"] = True
+        return result
 
     def __str__(self):
         return \
@@ -176,14 +181,16 @@ class ProjectConfig:
         self.last_updater_email = last_updater_email
 
     def __getstate__(self):
-        return {
+        result = {
             "templates": self.templates,
             "project_guid1": self.project_guid1,
             "project_guid2": self.project_guid2,
             "project_guid3": self.project_guid3,
             "template_file_cache": self.template_file_cache,
-            "last_updater_email": self.last_updater_email,
         }
+        if self.last_updater_email is not None:
+            result["last_updater_email"] = self.last_updater_email
+        return result
 
     def has_template(self, config: ProjectTemplateConfig) -> bool:
         assert config is not None
@@ -223,6 +230,8 @@ def from_file(settings: OpenPlateSettings, file_name: str) -> Optional[ProjectCo
 
 
 def to_file(data: ProjectConfig, file_name: str):
+    if not any(getattr(template, "requires_last_updater_email", False) for template in data.templates or []):
+        data.last_updater_email = None
     serialization.to_file(data, file_name)
 
 
@@ -276,6 +285,16 @@ def deserialize_templates(settings: OpenPlateSettings, data):
     return templates
 
 
+def deserialize_optional_bool(data, field_name: str) -> Optional[bool]:
+    if data is None:
+        return None
+
+    if not isinstance(data, bool):
+        raise TypeError(field_name + " in project configuration is not a boolean")
+
+    return data
+
+
 def deserialize_template(settings: OpenPlateSettings, data):
     url = data.get("src_url")
 
@@ -293,6 +312,7 @@ def deserialize_template(settings: OpenPlateSettings, data):
         data.get("no_cache"),
         data.get("src_url") or data.get("src_name") or data.get("src_folder"),
         data.get("dest_folder"),
+        requires_last_updater_email=deserialize_optional_bool(data.get("requires_last_updater_email"), "requires_last_updater_email") or False,
     )
 
 project_config_file_name = ".openplate.project.yaml"

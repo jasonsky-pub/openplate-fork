@@ -5,7 +5,7 @@
 - `openplate update`
 - `openplate update --update-missing`
 - `openplate update --update-full`
-- `openplate project verify`
+- `openplate verify`
 
 Matrix facets covered by this case:
 
@@ -17,7 +17,7 @@ Matrix facets covered by this case:
 - `update`
 - `update --update-missing`
 - `update --update-full`
-- `project verify`
+- `verify`
 
 ## Prerequisites
 

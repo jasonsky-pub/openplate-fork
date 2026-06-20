@@ -67,7 +67,11 @@ def compile_template_options(
     options["project_guid1"] = config_project.project_guid1 or ""
     options["project_guid2"] = config_project.project_guid2 or ""
     options["project_guid3"] = config_project.project_guid3 or ""
-    options["last_updater_email"] = config_project.last_updater_email or ""
+    options["last_updater_email"] = (
+        config_project.last_updater_email or ""
+        if getattr(config_project_template, "requires_last_updater_email", False)
+        else ""
+    )
 
     options["template_src_url"] = getattr(config_project_template, "template_src_url", None) or config_project_template.src_url or ""
     options["template_git_ssh_src_url"] = getattr(config_project_template, "template_git_ssh_src_url", "") or ""

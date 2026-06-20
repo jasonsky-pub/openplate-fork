@@ -32,7 +32,7 @@ The bash runner materializes local git-backed template repositories from the che
 | `case-1` | Configure a local environment and initialize from URL-based local catalog sources | `--version`, `config set`, `config get`, `init` | [manual-tests/case-1.md](manual-tests/case-1.md) |
 | `case-2` | Exercise prompt-driven init behavior and template-command safety gates | `init`, `config set --allow-template-commands`, `--ask-hidden` | [manual-tests/case-2.md](manual-tests/case-2.md) |
 | `case-3` | Export prompt JSON, mutate only the answers that matter, and import via file and stdin | `project print-init-json`, `init --prompts-json-file`, `init --prompts-json-stdin` | [manual-tests/case-3.md](manual-tests/case-3.md) |
-| `case-4` | Create drift, repair it with update modes, and verify the final state | `update`, `project verify` | [manual-tests/case-4.md](manual-tests/case-4.md) |
+| `case-4` | Create drift, repair it with update modes, and verify the final state | `update`, `verify` | [manual-tests/case-4.md](manual-tests/case-4.md) |
 
 ## Coverage Matrix
 
@@ -47,11 +47,12 @@ The matrix below accounts for the current visible CLI surface from [docs/command
 | Global `--ask-again` | `manual:case-4` | Case 4 reruns update with `--ask-again` to force parameter prompting during maintenance. |
 | Global `--ignore-tool-version` | `manual:case-1` | Case 1 initializes a fixture that requires `--ignore-tool-version` to bypass a synthetic tool gate. |
 | Global `--debug` | `manual:case-3` | Case 3 enables debug logging on file import so ignored-node and unused-answer warnings are captured. |
-| Global `--automation` | `manual:case-4` | Case 4 runs `project verify` in automation mode after repair and validates the machine-readable output shape. |
+| Global `--automation` | `manual:case-4` | Case 4 runs top-level `verify` in automation mode after repair and validates the machine-readable output shape. |
 | `config get` | `manual:case-1` | Case 1 captures config output and validates that removed source-resolution settings are omitted. |
 | `config set` removed source-resolution settings | `manual:case-1` | Case 1 explicitly proves `--vcs-url` and `--template-prefix` are rejected. |
 | `config set --parameter-default` add | `manual:case-1` | Case 1 adds a `service_name` default and uses it during init. |
 | `config set --parameter-default` remove | `manual:case-1` | Case 1 removes an `owner_name` default and validates that it disappears from config output. |
+| `config set --allow-last-updater-email` | `manual:case-1` | Case 1 persists the setting and validates that it is present in `config get` output. |
 | `config set --allow-template-commands` | `manual:case-2` | Case 2 toggles the persistent template-command setting after first showing the blocked behavior. |
 | Project-file omission of runtime-derived project metadata | `manual:case-1` | Case 1 and Case 4 validate that project config writes omit runtime-only project metadata fields. |
 | `init` top-level command | `manual:case-1` | Case 1 uses the documented top-level init entrypoint throughout. |
@@ -73,6 +74,7 @@ The matrix below accounts for the current visible CLI surface from [docs/command
 | `init --ignore` | `manual:case-1` | Case 1 filters the runbook file and validates that it is absent. |
 | `init --overwrite` | `manual:case-1` | Case 1 first proves a plain rerun of init is rejected for the same tracked template and dest-folder, then reruns with overwrite to verify files are restored, init commands do not rerun, and the project config does not gain a duplicate template entry. |
 | `init --allow-template-commands` | `manual:case-4` | Case 4 uses the one-time override on init, while Case 2 covers the persistent config toggle. |
+| `init/update --allow-last-updater-email` | `automated-only` | Focused consent-gating tests cover the per-run override, interactive caching, and non-interactive failure rules. |
 | `init hidden prompts` | `manual:case-2` | Case 2 validates hidden fallback and `--ask-hidden` behavior directly. |
 | `init conditionally_hidden` | `manual:case-2` | Case 2 demonstrates the parameter becoming visible only after the controlling answer changes. |
 | `init -r/--url` legacy alias | `automated-only` | Compatibility syntax remains covered by focused parser/runtime tests instead of manual cases. |
@@ -88,7 +90,8 @@ The matrix below accounts for the current visible CLI surface from [docs/command
 | `update` top-level command | `manual:case-4` | Case 4 uses the documented top-level update entrypoint. |
 | `update --update-missing` | `manual:case-4` | Case 4 restores a deleted non-readonly file with this mode. |
 | `update --update-full` | `manual:case-4` | Case 4 overwrites a drifted non-readonly file with this mode. |
-| `project verify` | `manual:case-4` | Case 4 validates both failing and passing verify runs. |
+| `verify` | `manual:case-4` | Case 4 validates both failing and passing top-level verify runs. |
+| Legacy `project verify` command path | `automated-only` | Compatibility entrypoints remain covered by focused parser/runtime tests. |
 | Legacy `project init` command path | `automated-only` | Compatibility entrypoints remain covered by focused parser/runtime tests. |
 | Legacy `project update` command path | `automated-only` | Compatibility entrypoints remain covered by focused parser/runtime tests. |
 | Removed `--project-folder` parser behavior | `automated-only` | Focused parser tests cover the rejection message for the renamed root flag. |

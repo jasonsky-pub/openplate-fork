@@ -50,6 +50,7 @@ def test_project_config_write_omits_runtime_metadata_fields(tmp_path):
     assert "project_src_url" not in written
     assert "project_repo_org" not in written
     assert "project_repo_name" not in written
+    assert "last_updater_email" not in written
 
 
 def test_project_config_load_ignores_persisted_runtime_metadata_fields(tmp_path):
@@ -111,6 +112,7 @@ def test_settings_serialization_omits_legacy_source_resolution_fields(tmp_path):
         "ot-",
         {"service_name": "demo"},
         True,
+        True,
     )
 
     settings_path = tmp_path / "settings.yaml"
@@ -121,6 +123,7 @@ def test_settings_serialization_omits_legacy_source_resolution_fields(tmp_path):
     assert written == {
         "default_values": {"service_name": "demo"},
         "allow_template_commands": True,
+        "allow_last_updater_email": True,
     }
 
 
@@ -141,6 +144,36 @@ def test_settings_load_ignores_legacy_source_resolution_fields(tmp_path):
     assert loaded.default_values == {"service_name": "demo"}
     assert loaded.vcs_url == open_plate_settings.defaultSettings.vcs_url
     assert loaded.template_prefix == open_plate_settings.defaultSettings.template_prefix
+    assert loaded.allow_last_updater_email is False
+
+
+def test_settings_load_reads_allow_last_updater_email(tmp_path):
+    settings_path = tmp_path / "settings.yaml"
+    settings_path.write_text(
+        "allow_last_updater_email: true\n",
+        encoding="utf-8",
+    )
+
+    loaded = open_plate_settings.from_file(str(settings_path))
+
+    assert loaded.allow_last_updater_email is True
+
+
+def test_project_config_load_reads_requires_last_updater_email(tmp_path):
+    config_path = tmp_path / project_config_file_name
+    config_path.write_text(
+        "\n".join([
+            "templates:",
+            "  - src_url: https://example.com/template.git#main",
+            "    dest_folder: .",
+            "    requires_last_updater_email: true",
+        ]),
+        encoding="utf-8",
+    )
+
+    loaded = project_config.from_file(open_plate_settings.defaultSettings, str(config_path))
+
+    assert loaded.templates[0].requires_last_updater_email is True
 
 
 def test_config_set_parser_rejects_removed_legacy_source_resolution_flags():

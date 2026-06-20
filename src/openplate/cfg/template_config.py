@@ -142,7 +142,8 @@ class TemplateConfig:
             init_commands: Optional[list[InitCommand]],
             default_dest_folder: Optional[str],
             multiplex: Optional[list[MultiplexFile]],
-            conditional: Optional[list[ConditionalFile]]
+                conditional: Optional[list[ConditionalFile]],
+                requires_last_updater_email: bool = False,
     ):
         if parameters is None:
             raise TypeError
@@ -166,6 +167,7 @@ class TemplateConfig:
         self.init_commands = init_commands
         self.multiplex = multiplex
         self.conditional = conditional
+        self.requires_last_updater_email = requires_last_updater_email
 
         self.default_dest_folder = None
         if default_dest_folder and default_dest_folder.strip():
@@ -207,7 +209,8 @@ def from_file(file_name: str) -> Optional[TemplateConfig]:
             None,
             None,
             [],
-            []
+            [],
+            False,
         )
     return deserialize_project_config(data)
 
@@ -241,8 +244,19 @@ def deserialize_project_config(data):
         deserialize_init_commands(data.get("init_commands")),
         data.get("default_dest_folder"),
         deserialize_multiplex_list(data.get("multiplex")),
-        deserialize_conditional_list(data.get("conditional"))
+        deserialize_conditional_list(data.get("conditional")),
+        deserialize_optional_bool(data.get("requires_last_updater_email"), "requires_last_updater_email") or False,
     )
+
+
+def deserialize_optional_bool(data, field_name: str) -> Optional[bool]:
+    if data is None:
+        return None
+
+    if not isinstance(data, bool):
+        raise TypeError(field_name + " in template configuration is not a boolean")
+
+    return data
 
 def deserialize_enum(data, enum_type):
     if data is None:

@@ -23,7 +23,11 @@ from openplate import template_processor
 from openplate.cfg import project_config, template_config
 from openplate.cfg.open_plate_settings import OpenPlateRuntimeSettings, OpenPlateSettings
 from openplate.cfg.project_config import ProjectTemplateConfig
-from openplate.project_metadata_resolver import resolve_project_metadata, resolve_template_source_metadata
+from openplate.project_metadata_resolver import (
+    resolve_project_metadata,
+    resolve_template_consent_metadata,
+    resolve_template_source_metadata,
+)
 from openplate.project_template_identity import prompt_dest_folder, prompt_identity_dest_folder, prompt_template_reference, source_cache_key
 from openplate.prompts.prompt_document import PromptDocument, PromptDocumentBuilder, PromptSiblingTemplateInfo
 from openplate.prompts.prompt_parameter_resolver import describe_prompt_parameters
@@ -64,7 +68,8 @@ async def _collect_prompt_document_template(
         config_project_template.dest_folder = config_template.default_dest_folder or ""
 
     resolve_template_source_metadata(config_project_template, source)
-    resolve_project_metadata(runtime_settings, config_project, project_folder)
+    resolve_template_consent_metadata(config_template, config_project_template)
+    resolve_project_metadata(runtime_settings, config_project, project_folder, False)
 
     try:
         parameters = describe_prompt_parameters(

@@ -16,15 +16,27 @@ Set configuration for the tool (available in ~/.openplate)
 openplate config set --parameter-default service_name=my-service
 ```
 
-`config set` now supports persistent parameter defaults and the `--allow-template-commands` safety setting. Legacy source-resolution settings such as `--vcs-url` and `--template-prefix` are no longer supported runtime configuration.
+`config set` supports persistent parameter defaults and persistent trust/consent settings. Legacy source-resolution settings such as `--vcs-url` and `--template-prefix` are no longer supported runtime configuration.
 
-### Default Parameters
+### Persistent Settings
 
-You can also set default parameters which will override template defaults, example:
+- `--parameter-default <name>=<value>` sets a default parameter value for later runs.
 
-```
-openplate config set --parameter-default git_org=my-org
-```
+  ```
+  openplate config set --parameter-default git_org=my-org
+  ```
+
+- `--allow-template-commands` allows template-provided init commands to run by default during later init runs.
+
+  ```
+  openplate config set --allow-template-commands
+  ```
+
+- `--allow-last-updater-email` allows templates that require `last_updater_email` during later init or update runs.
+
+  ```
+  openplate config set --allow-last-updater-email
+  ```
 
 ## Command: init
 
@@ -48,24 +60,49 @@ openplate init file:///C:/repos/template-catalog#main
 
 The legacy nested `project` variant still works for compatibility, but `openplate init` is the documented command.
 
+### One-Time Init Overrides
+
+- `--allow-template-commands` allows template-provided `init_commands` to run for this init invocation.
+
+  ```
+  openplate init --allow-template-commands https://github.com/my-org/ot-template.git#v1
+  ```
+
+- `--allow-last-updater-email` allows a template that requires `last_updater_email` to use it for this init invocation.
+
+  ```
+  openplate init --allow-last-updater-email https://github.com/my-org/ot-template.git#v1
+  ```
+
+### SSH Key Selection
+
+If you need a non-default SSH key for an SSH template URL, export `GIT_SSH_COMMAND` before running OpenPlate so Git uses the expected identity:
+
+```
+export GIT_SSH_COMMAND='ssh -i ~/.ssh/special-openplate-key -o IdentitiesOnly=yes'
+openplate init git@github.com:my-org/template-catalog.git?path=python/api#main
+```
+
+This applies only to SSH template URLs. HTTPS template URLs do not use SSH keys.
+
 ### Project Root Resolution
 
-`init`, `update`, `project verify`, and `project print-init-json` share the `--project-root` option.
+`init`, `update`, `verify`, and `project print-init-json` share the `--project-root` option.
 
 - `--project-root <path>` sets the managed project root explicitly.
 - if `--project-root` is omitted and the invocation folder is inside a Git work tree, OpenPlate uses the Git top-level folder as the project root and the invocation-relative path as the default `dest_folder`
 - if `--project-root` is omitted outside Git, OpenPlate uses the invocation folder and defaults `dest_folder` to `.`
 - `--project-folder` is no longer accepted; use `--project-root` instead
 
-Examples:
+Project root examples:
 
 ```
 openplate init --project-root C:/workspaces/my-repo https://github.com/my-org/ot-template.git#v1
 openplate update --project-root C:/workspaces/my-repo --update-full
-openplate project verify --project-root C:/workspaces/my-repo
+openplate verify --project-root C:/workspaces/my-repo
 ```
 
-Examples:
+Source URL examples:
 
 ```
 openplate init https://github.com/my-org/ot-template.git#v1
@@ -108,15 +145,27 @@ openplate update
 
 The legacy nested `project` variant still works for compatibility, but `openplate update` is the documented command.
 
-Common update modes:
+### One-Time Update Overrides
 
-```
-openplate update --update-missing
-openplate update --update-full
-```
+- `--allow-last-updater-email` allows tracked templates that require `last_updater_email` to use it for this update invocation.
+
+  ```
+  openplate update --allow-last-updater-email
+  ```
+
+### Update Modes
 
 - `--update-missing` recreates missing non-readonly files without overwriting existing non-readonly files.
+
+  ```
+  openplate update --update-missing
+  ```
+
 - `--update-full` is the overwrite-oriented maintenance mode. It recreates missing non-readonly files and overwrites existing non-readonly files.
+
+  ```
+  openplate update --update-full
+  ```
 
 ## Prompt JSON Workflow
 
@@ -211,12 +260,12 @@ Notes:
 - imported nodes that are not processed by the run are ignored and logged by `node-id`.
 - OpenPlate warns when supplied prompt answers are left unused for a matched node.
 
-## Command: project verify
+## Command: verify
 
 Verify that the project has not drifted from the template. Exit with code -1 if so.
 
 ```
-openplate project verify
+openplate verify
 ```
 
 ## Ask Again

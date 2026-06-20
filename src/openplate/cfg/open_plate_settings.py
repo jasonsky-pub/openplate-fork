@@ -27,7 +27,8 @@ class OpenPlateSettings:
             vcs_url: str,
             template_prefix: str,
             default_values: dict[str, str],
-            allow_template_commands: bool
+            allow_template_commands: bool,
+        allow_last_updater_email: bool = False,
     ):
         if vcs_url is None:
             raise TypeError
@@ -35,11 +36,13 @@ class OpenPlateSettings:
         self.template_prefix = template_prefix
         self.default_values = default_values or {}
         self.allow_template_commands = allow_template_commands or False
+        self.allow_last_updater_email = allow_last_updater_email or False
 
     def __getstate__(self):
         return {
             "default_values": self.default_values,
             "allow_template_commands": self.allow_template_commands,
+            "allow_last_updater_email": self.allow_last_updater_email,
         }
 
 class OpenPlateRuntimeSettings:
@@ -48,12 +51,21 @@ class OpenPlateRuntimeSettings:
             ask_again: bool,
             ask_hidden: bool,
             ignore_tool_version: bool,
-            is_automation: bool
+            is_automation: bool,
+            allow_last_updater_email: bool = False,
+            is_prompt_json_input: bool = False,
+            can_prompt_for_last_updater_email: bool = False,
+            can_resolve_last_updater_email: bool = False,
     ):
         self.ask_again = ask_again
         self.ask_hidden = ask_hidden
         self.ignore_tool_version = ignore_tool_version
         self.is_automation = is_automation
+        self.allow_last_updater_email = allow_last_updater_email
+        self.is_prompt_json_input = is_prompt_json_input
+        self.can_prompt_for_last_updater_email = can_prompt_for_last_updater_email
+        self.can_resolve_last_updater_email = can_resolve_last_updater_email
+        self.last_updater_email_consent = True if allow_last_updater_email else None
 
 
 def from_file(file_name: str):
@@ -74,13 +86,20 @@ def deserialize_settings(data):
     else:
         allow_template_commands = str_to_bool(allow_template_commands_raw)
 
+    allow_last_updater_email_raw = data.get("allow_last_updater_email")
+    if allow_last_updater_email_raw is None:
+        allow_last_updater_email = defaultSettings.allow_last_updater_email
+    else:
+        allow_last_updater_email = str_to_bool(allow_last_updater_email_raw)
+
     return OpenPlateSettings(
         defaultSettings.vcs_url,
         defaultSettings.template_prefix,
         deserialize_string_dictionary(data.get("default_values"), "default_values"),
-        allow_template_commands
+        allow_template_commands,
+        allow_last_updater_email,
     )
 
 
-defaultSettings = OpenPlateSettings("https://github.com", "ot-", {}, False)
+defaultSettings = OpenPlateSettings("https://github.com", "ot-", {}, False, False)
 defaultSettingsLocation = "~/.openplate"

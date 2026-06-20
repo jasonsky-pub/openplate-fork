@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from openplate import project_config_resolver
 from openplate.cfg.open_plate_settings import OpenPlateRuntimeSettings, defaultSettings
 from openplate.cfg.project_config import ProjectConfig, ProjectTemplateConfig
 from openplate.cfg.template_config import TemplateConfig
@@ -25,7 +26,7 @@ class _FakeTemplateSource:
         return self._resolved_ref
 
 
-def _empty_template_config() -> TemplateConfig:
+def _empty_template_config(requires_last_updater_email: bool = False) -> TemplateConfig:
     return TemplateConfig(
         parameters=[],
         ignore_paths=[],
@@ -47,6 +48,7 @@ def _empty_template_config() -> TemplateConfig:
         default_dest_folder=".",
         multiplex=[],
         conditional=[],
+        requires_last_updater_email=requires_last_updater_email,
     )
 
 
@@ -280,3 +282,226 @@ def test_non_git_template_source_leaves_template_git_metadata_empty(tmp_path):
     assert options["template_git_repo_name"] == ""
     assert options["template_git_repo_path"] == ""
     assert options["template_git_repo_ref"] == ""
+
+
+def test_compile_template_options_omits_last_updater_email_for_non_requiring_template(tmp_path):
+    config_project_template = ProjectTemplateConfig(
+        "https://example.com/template.git#main",
+        None,
+        None,
+        ".",
+        None,
+        {},
+        [],
+        False,
+    )
+    config_project = ProjectConfig([], None, None, None, None, None, None, None, None, None, None, {}, {}, "tests@example.com")
+
+    options = compile_template_options(
+        _empty_template_config(),
+        config_project,
+        config_project_template,
+        str(tmp_path),
+        str(tmp_path),
+        True,
+    )
+
+    assert options["last_updater_email"] == ""
+
+
+def test_compile_template_options_exposes_last_updater_email_for_requiring_template(tmp_path):
+    config_project_template = ProjectTemplateConfig(
+        "https://example.com/template.git#main",
+        None,
+        None,
+        ".",
+        None,
+        {},
+        [],
+        False,
+        requires_last_updater_email=True,
+    )
+    config_project = ProjectConfig([], None, None, None, None, None, None, None, None, None, None, {}, {}, "tests@example.com")
+
+    options = compile_template_options(
+        _empty_template_config(requires_last_updater_email=True),
+        config_project,
+        config_project_template,
+        str(tmp_path),
+        str(tmp_path),
+        True,
+    )
+
+    assert options["last_updater_email"] == "tests@example.com"
+
+
+def test_project_config_resolver_requires_last_updater_email_consent_in_automation(tmp_path):
+    project_root = tmp_path / "project"
+    _create_git_repo(project_root)
+
+    config_project_template = ProjectTemplateConfig(
+        "https://example.com/template.git#main",
+        None,
+        None,
+        ".",
+        None,
+        {},
+        [],
+        False,
+        requires_last_updater_email=True,
+    )
+    config_project = ProjectConfig(
+        [config_project_template],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        {},
+        {},
+        None,
+    )
+
+    with pytest.raises(RuntimeError, match="last_updater_email but it is not allowed"):
+        project_config_resolver.resolve(
+            defaultSettings,
+            OpenPlateRuntimeSettings(False, False, True, True, False, False, True, True),
+            _empty_template_config(requires_last_updater_email=True),
+            config_project,
+            config_project_template,
+            str(project_root),
+            str(project_root),
+            False,
+        )
+
+
+def test_project_config_resolver_prompts_once_for_requiring_templates(tmp_path, monkeypatch):
+    project_root = tmp_path / "project"
+    _create_git_repo(project_root)
+
+    template_one = ProjectTemplateConfig(
+        "https://example.com/template-one.git#main",
+        None,
+        None,
+        ".",
+        None,
+        {},
+        [],
+        False,
+        requires_last_updater_email=True,
+    )
+    template_two = ProjectTemplateConfig(
+        "https://example.com/template-two.git#main",
+        None,
+        None,
+        "services/api",
+        None,
+        {},
+        [],
+        False,
+        requires_last_updater_email=True,
+    )
+    config_project = ProjectConfig(
+        [template_one, template_two],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        {},
+        {},
+        None,
+    )
+
+    prompt_calls = []
+    answers = iter(["yes"])
+
+    def _answer(_prompt):
+        prompt_calls.append(True)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", _answer)
+
+    runtime_settings = OpenPlateRuntimeSettings(False, False, True, False, False, False, True, True)
+
+    project_config_resolver.resolve(
+        defaultSettings,
+        runtime_settings,
+        _empty_template_config(requires_last_updater_email=True),
+        config_project,
+        template_one,
+        str(project_root),
+        str(project_root),
+        False,
+    )
+    project_config_resolver.resolve(
+        defaultSettings,
+        runtime_settings,
+        _empty_template_config(requires_last_updater_email=True),
+        config_project,
+        template_two,
+        str(project_root),
+        str(project_root),
+        False,
+    )
+
+    assert len(prompt_calls) == 1
+    assert config_project.last_updater_email == "tests@example.com"
+
+
+def test_project_config_resolver_does_not_prompt_when_resolution_is_disabled(tmp_path, monkeypatch):
+    project_root = tmp_path / "project"
+    _create_git_repo(project_root)
+
+    config_project_template = ProjectTemplateConfig(
+        "https://example.com/template.git#main",
+        None,
+        None,
+        ".",
+        None,
+        {},
+        [],
+        False,
+        requires_last_updater_email=True,
+    )
+    config_project = ProjectConfig(
+        [config_project_template],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        {},
+        {},
+        "persisted@example.com",
+    )
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: pytest.fail("unexpected last_updater_email prompt"))
+
+    project_config_resolver.resolve(
+        defaultSettings,
+        OpenPlateRuntimeSettings(False, False, True, False),
+        _empty_template_config(requires_last_updater_email=True),
+        config_project,
+        config_project_template,
+        str(project_root),
+        str(project_root),
+        True,
+    )
+
+    assert config_project.last_updater_email == "persisted@example.com"

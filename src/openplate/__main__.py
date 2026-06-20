@@ -90,6 +90,13 @@ def configure_project_init_parser(parser):
         help="One-time override to allow template-provided init_commands to run during this init.",
         action="store_true"
     )
+    parser.add_argument(
+        "--allow-last-updater-email",
+        required=False,
+        default=False,
+        help="One-time override to allow a requiring template to use last_updater_email during this run.",
+        action="store_true"
+    )
     add_prompt_document_input_arguments(parser)
 
 
@@ -101,6 +108,13 @@ def configure_project_update_parser(parser):
     parser.add_argument("-f", "--update-full",
                         required=False, help="Full update, overwrite existing non-template files (WARNING: will overwrite changes)",
                         action=argparse.BooleanOptionalAction)
+    parser.add_argument(
+        "--allow-last-updater-email",
+        required=False,
+        default=False,
+        help="One-time override to allow a requiring template to use last_updater_email during this run.",
+        action="store_true"
+    )
 
 
 def configure_project_verify_parser(parser):
@@ -125,7 +139,7 @@ def create_arg_parser(args):
         required=False, default=False, action=argparse.BooleanOptionalAction,
         help="Present an automation readable response instead of human readable one.  Use rules related to automation.")
 
-    subparsers = arg_parser.add_subparsers(required="--version" not in args, metavar="{config,init,update}")
+    subparsers = arg_parser.add_subparsers(required="--version" not in args, metavar="{config,init,update,verify}")
 
     parser_config = subparsers.add_parser("config")
     config_subparsers = parser_config.add_subparsers(required=True)
@@ -143,6 +157,13 @@ def create_arg_parser(args):
         help="Allow template-provided init_commands to run during project init (unsafe unless you trust the template source).",
         action=argparse.BooleanOptionalAction
     )
+    parser_set_config.add_argument(
+        "--allow-last-updater-email",
+        required=False,
+        default=None,
+        help="Allow requiring templates to use last_updater_email during init or update.",
+        action=argparse.BooleanOptionalAction
+    )
 
     parser_init = subparsers.add_parser("init")
     add_common_project_runtime_arguments(parser_init)
@@ -151,6 +172,10 @@ def create_arg_parser(args):
     parser_update = subparsers.add_parser("update")
     add_common_project_runtime_arguments(parser_update)
     configure_project_update_parser(parser_update)
+
+    parser_verify = subparsers.add_parser("verify")
+    add_common_project_runtime_arguments(parser_verify)
+    configure_project_verify_parser(parser_verify)
 
     parser_project = subparsers.add_parser("project", help=argparse.SUPPRESS)
     add_common_project_runtime_arguments(parser_project)
@@ -234,22 +259,33 @@ async def async_main(args):
 
     runtime_settings = None
     project_context = None
+    prompts_json_input_present = bool(getattr(result, "prompts_json_file", None) or getattr(result, "prompts_json_stdin", False))
     if result.command.startswith("project"):
-        runtime_settings = OpenPlateRuntimeSettings(result.ask_again, result.ask_hidden, result.ignore_tool_version, result.automation)
+        runtime_settings = OpenPlateRuntimeSettings(
+            result.ask_again,
+            result.ask_hidden,
+            result.ignore_tool_version,
+            result.automation,
+            getattr(result, "allow_last_updater_email", False),
+            prompts_json_input_present,
+            result.command in {"project-init", "project-update"},
+            result.command in {"project-init", "project-update"},
+        )
         project_context = resolve_project_runtime_context(
             os.getcwd(),
             getattr(result, "project_root", None),
             getattr(result, "dest_folder", None) if result.command == "project-init" else None,
         )
     else:
-        runtime_settings = OpenPlateRuntimeSettings(False, False, False, result.automation)
+        runtime_settings = OpenPlateRuntimeSettings(False, False, False, result.automation, False)
 
     if result.command == "config-set":
         defaults = {}
 
         if (not result.parameter_default
-                and result.allow_template_commands is None):
-            raise ValueError("Must set at least one setting (parameter-default, allow-template-commands)")
+                and result.allow_template_commands is None
+                and result.allow_last_updater_email is None):
+            raise ValueError("Must set at least one setting (parameter-default, allow-template-commands, allow-last-updater-email)")
 
         if result.parameter_default:
             for parameter_string in result.parameter_default:
@@ -260,7 +296,12 @@ async def async_main(args):
                 value = parts[1]
                 defaults[key] = value
 
-        options = ConfigSetOptions(config_file, defaults, result.allow_template_commands)
+        options = ConfigSetOptions(
+            config_file,
+            defaults,
+            result.allow_template_commands,
+            result.allow_last_updater_email,
+        )
         await config_set.run(configuration, options)
     elif result.command == "config-get":
         await config_get.run(configuration)

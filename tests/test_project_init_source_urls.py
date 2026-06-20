@@ -69,7 +69,7 @@ def test_create_arg_parser_accepts_top_level_init_with_shared_project_options():
 
 
 def test_create_arg_parser_accepts_top_level_update_with_shared_project_options():
-    args = ["openplate", "update", "--project-root", "workspace", "--ask-again", "--update-full"]
+    args = ["openplate", "update", "--project-root", "workspace", "--ask-again", "--update-full", "--allow-last-updater-email"]
     parser = create_arg_parser(args)
 
     result = parser.parse_args(args[1:])
@@ -78,6 +78,7 @@ def test_create_arg_parser_accepts_top_level_update_with_shared_project_options(
     assert result.project_root == "workspace"
     assert result.ask_again is True
     assert result.update_full is True
+    assert result.allow_last_updater_email is True
 
 
 def test_create_arg_parser_accepts_legacy_project_update_with_shared_project_options():
@@ -103,9 +104,30 @@ def test_create_arg_parser_top_level_help_hides_project_command():
 
     help_text = parser.format_help()
 
-    assert "{config,init,update}" in help_text
-    assert "{config,init,update,project}" not in help_text
+    assert "{config,init,update,verify}" in help_text
+    assert "{config,init,update,verify,project}" not in help_text
     assert "==SUPPRESS==" not in help_text
+
+
+def test_create_arg_parser_accepts_top_level_verify_with_shared_project_options():
+    args = ["openplate", "verify", "--project-root", "workspace", "--ask-hidden"]
+    parser = create_arg_parser(args)
+
+    result = parser.parse_args(args[1:])
+
+    assert result.command == "project-verify"
+    assert result.project_root == "workspace"
+    assert result.ask_hidden is True
+
+
+def test_create_arg_parser_accepts_legacy_project_verify_with_shared_project_options():
+    args = ["openplate", "project", "--project-root", "workspace", "verify"]
+    parser = create_arg_parser(args)
+
+    result = parser.parse_args(args[1:])
+
+    assert result.command == "project-verify"
+    assert result.project_root == "workspace"
 
 
 def test_create_arg_parser_accepts_prompts_json_input_flags_for_top_level_init():

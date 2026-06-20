@@ -23,10 +23,11 @@ from openplate.cfg.open_plate_settings import OpenPlateSettings
 
 
 class ConfigSetOptions:
-    def __init__(self, config_file, defaults, allow_template_commands):
+    def __init__(self, config_file, defaults, allow_template_commands, allow_last_updater_email):
         self.config_file = config_file
         self.defaults = defaults or {}
         self.allow_template_commands = allow_template_commands
+        self.allow_last_updater_email = allow_last_updater_email
 
 
 async def run(settings: OpenPlateSettings, options: ConfigSetOptions):
@@ -44,7 +45,8 @@ async def run(settings: OpenPlateSettings, options: ConfigSetOptions):
         settings.vcs_url or open_plate_settings.defaultSettings.vcs_url,
         settings.template_prefix or open_plate_settings.defaultSettings.template_prefix,
         merged_defaults,
-        settings.allow_template_commands if options.allow_template_commands is None else options.allow_template_commands
+        settings.allow_template_commands if options.allow_template_commands is None else options.allow_template_commands,
+        settings.allow_last_updater_email if options.allow_last_updater_email is None else options.allow_last_updater_email,
     )
 
     logging.debug(f"Setting Configuration to: {newConfiguration.__str__()}")

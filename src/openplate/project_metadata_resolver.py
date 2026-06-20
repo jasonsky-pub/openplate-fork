@@ -19,6 +19,7 @@
 import os
 
 from openplate.cfg import project_config
+from openplate.cfg.template_config import TemplateConfig
 from openplate.cfg.open_plate_settings import OpenPlateRuntimeSettings
 from openplate.git import (
     GitTemplateReference,
@@ -28,6 +29,7 @@ from openplate.git import (
     get_git_url,
     parse_git_url,
 )
+from openplate.util import str_to_bool
 
 
 def _set_runtime_value(target, field_name: str, value) -> bool:
@@ -106,10 +108,50 @@ def resolve_template_source_metadata(
     return any_changed
 
 
+def resolve_template_consent_metadata(
+    config_template: TemplateConfig,
+    config_project_template: project_config.ProjectTemplateConfig,
+) -> bool:
+    return _set_runtime_value(
+        config_project_template,
+        "requires_last_updater_email",
+        bool(getattr(config_template, "requires_last_updater_email", False)),
+    )
+
+
+def resolve_last_updater_email_consent(runtime_settings: OpenPlateRuntimeSettings, settings, template_name: str) -> bool:
+    if runtime_settings.last_updater_email_consent is not None:
+        return runtime_settings.last_updater_email_consent
+
+    if runtime_settings.allow_last_updater_email or settings.allow_last_updater_email:
+        runtime_settings.last_updater_email_consent = True
+        return True
+
+    if runtime_settings.is_automation or runtime_settings.is_prompt_json_input or not runtime_settings.can_prompt_for_last_updater_email:
+        runtime_settings.last_updater_email_consent = False
+        return False
+
+    while True:
+        answer = input(
+            f"Template '{template_name}' requires last_updater_email. Allow OpenPlate to read your Git email for this run? [y/N]: "
+        )
+
+        if not answer or not answer.strip():
+            runtime_settings.last_updater_email_consent = False
+            return False
+
+        try:
+            runtime_settings.last_updater_email_consent = str_to_bool(answer)
+            return runtime_settings.last_updater_email_consent
+        except ValueError:
+            print("ERROR: Please answer yes or no.")
+
+
 def resolve_project_metadata(
     runtime_settings: OpenPlateRuntimeSettings,
     config_project: project_config.ProjectConfig,
     project_base_folder: str,
+    resolve_last_updater_email: bool = False,
 ) -> bool:
     any_changed = False
     root_folder_name = os.path.basename(os.path.abspath(os.path.normpath(project_base_folder)))
@@ -157,8 +199,7 @@ def resolve_project_metadata(
     if _set_runtime_value(config_project, "project_folder_name", project_folder_name):
         any_changed = True
 
-    # Do not update the user email when doing automated processing:
-    if not runtime_settings.is_automation:
+    if resolve_last_updater_email:
         try:
             last_updater_email = get_git_email(project_base_folder)
             if not config_project.last_updater_email or config_project.last_updater_email != last_updater_email:

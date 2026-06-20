@@ -23,7 +23,7 @@ from openplate import template_processor
 from openplate.cfg import template_config, project_config
 from openplate.cfg.open_plate_settings import OpenPlateRuntimeSettings, OpenPlateSettings
 from openplate.cfg.template_config import TemplateConfigParameter
-from openplate.project_metadata_resolver import resolve_project_metadata
+from openplate.project_metadata_resolver import resolve_last_updater_email_consent, resolve_project_metadata
 from openplate.prompts.prompt_document import PromptInputTracker
 from openplate.prompts.prompt_parameter_resolver import (
     log_unused_prompt_parameters,
@@ -184,7 +184,26 @@ def resolve(
     fail_on_prompt: bool,
     prompt_input_tracker: Optional[PromptInputTracker] = None,
 ) -> bool:
-    any_changed = resolve_project_metadata(runtime_settings, config_project, project_base_folder)
+    should_resolve_last_updater_email = False
+
+    if getattr(config_project_template, "requires_last_updater_email", False) and runtime_settings.can_resolve_last_updater_email:
+        if not resolve_last_updater_email_consent(
+            runtime_settings,
+            settings,
+            config_project_template.get_template_source_name(),
+        ):
+            raise RuntimeError(
+                "Template requires last_updater_email but it is not allowed. "
+                "Re-run with '--allow-last-updater-email' or set 'openplate config set --allow-last-updater-email'."
+            )
+        should_resolve_last_updater_email = True
+
+    any_changed = resolve_project_metadata(
+        runtime_settings,
+        config_project,
+        project_base_folder,
+        should_resolve_last_updater_email,
+    )
     any_asked = False
 
     mark_template_used(prompt_input_tracker, config_project_template)

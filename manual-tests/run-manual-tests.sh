@@ -352,11 +352,12 @@ run_case1() {
   initialize_git_repo "$project_c"
 
   invoke_openplate "$case_id" '01-version.log' '0' '' --version >/dev/null
-  invoke_openplate "$case_id" '02-config-set.log' '0' '' -c "$(to_windows_path "$config_path")" config set --parameter-default 'service_name=bootstrap-default' --parameter-default 'owner_name=platform-team' --allow-template-commands >/dev/null
+  invoke_openplate "$case_id" '02-config-set.log' '0' '' -c "$(to_windows_path "$config_path")" config set --parameter-default 'service_name=bootstrap-default' --parameter-default 'owner_name=platform-team' --allow-template-commands --allow-last-updater-email >/dev/null
   invoke_openplate "$case_id" '03-config-remove-default.log' '0' '' -c "$(to_windows_path "$config_path")" config set --parameter-default 'owner_name=' >/dev/null
   local config_log
   config_log="$(invoke_openplate "$case_id" '04-config-get.log' '0' '' -c "$(to_windows_path "$config_path")" config get)"
   assert_file_contains "$config_log" 'allow_template_commands: true'
+  assert_file_contains "$config_log" 'allow_last_updater_email: true'
   assert_file_contains "$config_log" 'service_name: bootstrap-default'
   assert_file_not_contains "$config_log" 'owner_name: platform-team'
   assert_file_not_contains "$config_log" 'vcs_url:'
@@ -639,7 +640,7 @@ run_case4() {
   rm -f "$runbook_path"
 
   local verify_fail_log
-  verify_fail_log="$(invoke_openplate "$case_id" '02-verify-before-update.log' '1' '' -c "$(to_windows_path "$config_path")" project --project-root "$(to_windows_path "$project_path")" verify)"
+  verify_fail_log="$(invoke_openplate "$case_id" '02-verify-before-update.log' '1' '' -c "$(to_windows_path "$config_path")" verify --project-root "$(to_windows_path "$project_path")")"
   assert_file_contains "$verify_fail_log" 'Running verify on folder:'
 
   invoke_openplate "$case_id" '03-update-missing.log' '0' $'update-demo\nlambda' -c "$(to_windows_path "$config_path")" update --project-root "$(to_windows_path "$project_path")" --ask-again --update-missing >/dev/null
@@ -658,17 +659,17 @@ run_case4() {
   assert_file_not_contains "$project_config_path" 'project_git_repo_url:'
 
   local verify_pass_log
-  verify_pass_log="$(invoke_openplate "$case_id" '05-verify-after-update.log' '0' '' -c "$(to_windows_path "$config_path")" project --project-root "$(to_windows_path "$project_path")" verify)"
+  verify_pass_log="$(invoke_openplate "$case_id" '05-verify-after-update.log' '0' '' -c "$(to_windows_path "$config_path")" verify --project-root "$(to_windows_path "$project_path")")"
   assert_file_contains "$verify_pass_log" 'Done!'
 
   local automation_verify_log
-  automation_verify_log="$(invoke_openplate "$case_id" '06-verify-automation.log' '0' '' -a -c "$(to_windows_path "$config_path")" project --project-root "$(to_windows_path "$project_path")" verify)"
+  automation_verify_log="$(invoke_openplate "$case_id" '06-verify-automation.log' '0' '' -a -c "$(to_windows_path "$config_path")" verify --project-root "$(to_windows_path "$project_path")")"
   assert_file_not_contains "$automation_verify_log" 'Running verify on folder:'
 
   write_summary "$case_id" \
     "Catalog repo: $repo_path" \
     "Source: $source_url" \
-    'Validated update, --update-missing, --update-full, --ask-again, project verify in human mode, and project verify with --automation output.'
+    'Validated update, --update-missing, --update-full, --ask-again, top-level verify in human mode, and top-level verify with --automation output.'
 }
 
 ensure_dir "$WORK_ROOT"

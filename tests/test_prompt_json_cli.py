@@ -396,6 +396,35 @@ parameters:
     assert written_config["templates"][0]["parameters"]["service_name"] == "demo"
 
 
+def test_project_init_with_prompt_json_rejects_requiring_last_updater_email_without_allow(tmp_path, monkeypatch):
+    repo_path = tmp_path / "template"
+    source_url = _write_template_repo(repo_path, "requires_last_updater_email: true\n")
+    project_path = tmp_path / "project"
+    project_path.mkdir()
+    prompts_path = tmp_path / "prompts.json"
+    prompts_path.write_text("[]", encoding="utf-8")
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: pytest.fail("unexpected last_updater_email prompt"))
+
+    args = [
+        "openplate",
+        "-c",
+        str(tmp_path / "missing-config.yaml"),
+        "project",
+        "--project-root",
+        str(project_path),
+        "init",
+        source_url,
+        "--dest-folder",
+        ".",
+        "--prompts-json-file",
+        str(prompts_path),
+    ]
+
+    with pytest.raises(RuntimeError, match="last_updater_email but it is not allowed"):
+        asyncio.run(async_main(args))
+
+
 def test_project_init_accepts_prompts_json_from_stdin(tmp_path, monkeypatch):
     repo_path = tmp_path / "template"
     source_url = _write_template_repo(
