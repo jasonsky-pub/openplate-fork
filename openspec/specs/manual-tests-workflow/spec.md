@@ -15,8 +15,8 @@ OpenPlate SHALL keep a checked-in `manual-tests/` workspace that is the source o
 The initial manual test suite SHALL define these numbered cases and their primary coverage areas:
 - `manual-tests/case-1.md`: config persistence plus URL-source init behavior, including `config set`, `config get`, the primary `openplate init` source-selection workflow, `--project-root`, invalid explicit Git subfolder root overrides, Git-mode `dest_folder` defaults, explicit `--dest-folder` overrides, project-file metadata omission, SSH or HTTPS metadata handling, HTTPS credential scrubbing, template source `?path=` and `#ref` preservation, non-Git template-source metadata emptiness, and legacy-source migration behavior
 - `manual-tests/case-2.md`: interactive `openplate init` behavior, including hidden-parameter and `conditionally_hidden` behavior
-- `manual-tests/case-3.md`: `openplate project print-init-json`, `openplate project print-init-json --verbose`, `openplate init --prompts-json-file`, and `openplate init --prompts-json-stdin`
-- `manual-tests/case-4.md`: `openplate update` and `openplate project verify`, exercised against a project with intentional drift while anchored at the resolved project root folder
+- `manual-tests/case-3.md`: prompt JSON round-trip behavior, including `openplate project print-init-json`, `openplate project print-init-json --verbose`, `openplate project print-init-json --dest-folder`, `openplate project print-update-json`, `openplate init --prompts-json-file`, `openplate init --prompts-json-stdin`, `openplate update --prompts-json-file`, and `openplate update --prompts-json-stdin`, plus init placement-consistency behavior, update hidden-parameter visibility, and prompt JSON invalid-choice rejection behavior
+- `manual-tests/case-4.md`: `openplate update`, `openplate update --update-missing`, `openplate update --update-full`, and `openplate project verify`, exercised against a project with intentional drift while anchored at the resolved project root folder
 
 The manual test index SHALL map those cases back to the current documented command surface.
 
@@ -29,6 +29,10 @@ The seeded case layout SHALL group commands by end-to-end operator workflow rath
 #### Scenario: Contributor checks which case covers init behavior
 - **WHEN** a contributor reads the manual test inventory
 - **THEN** the inventory identifies `manual-tests/case-1.md` and `manual-tests/case-2.md` as the seeded cases for init behavior, split between source, root, and destination concerns versus interactive runtime concerns
+
+#### Scenario: Contributor checks which case covers prompt JSON behavior
+- **WHEN** a contributor reads the manual test inventory
+- **THEN** the inventory identifies `manual-tests/case-3.md` as the seeded case for prompt JSON export, import, and validation behavior across init and update
 
 #### Scenario: Contributor checks which case covers update and verify behavior
 - **WHEN** a contributor reads the manual test inventory
@@ -63,7 +67,7 @@ At minimum, this matrix SHALL account for:
 - global CLI facets such as `--version`, `--config-file`, `--project-root`, `--ask-hidden`, `--ask-again`, `--ignore-tool-version`, `--debug`, and `--automation`
 - config command facets including `config get`, `config set`, project-file omission of runtime-derived project metadata, and the omission of legacy name-resolution settings from supported behavior
 - init source and runtime facets including local file URLs, SSH and HTTPS Git URLs, sanitized HTTPS Git URLs, non-Git template URLs, `?path=` sub-folders, explicit refs, preserved template `#ref` semantics, deprecated Liquid alias availability, `--allow-default-branch`, deprecated `-r/--url`, invalid explicit Git subfolder `--project-root` handling, Git-mode default `dest_folder` resolution, exact `--dest-folder` override behavior, `--no-cache`, `--overwrite`, `--ignore`, and `--allow-template-commands`
-- prompt JSON export and import facets
+- prompt JSON export and import facets for init and update, including init print or import placement consistency, update project-context consistency, update hidden-parameter inclusion, explicit clear semantics, and invalid choice rejection
 - update and verify facets
 - legacy compatibility and removed-option parser behavior
 
@@ -104,7 +108,9 @@ Every full executable end-to-end manual test case that the repository tracks for
 - **THEN** the corresponding `manual-tests/case-X.md` file identifies any output, files, prompts, or behavioral results that a human still must verify
 
 ### Requirement: Manual test fixtures remain public-safe and generated state stays ignored
-Checked-in manual test fixtures SHALL live under `manual-tests/templates/` and SHALL avoid internal or company-specific files, template references, URLs, names, or identifiers. Generated repositories, temporary workspaces, captured outputs, and other disposable manual-test state SHALL be kept in dedicated gitignored working folders.
+Checked-in manual test fixtures SHALL live under `manual-tests/templates/` and SHALL avoid internal or company-specific files, template references, URLs, names, or identifiers. Generated repositories, temporary workspaces, captured outputs, and other disposable manual-test state SHALL be kept in dedicated gitignored working folders or in a temporary repo-shaped sandbox created solely for the current run.
+
+When a manual workflow needs to change repo-level git settings or current branch state, that mutation SHALL occur only inside a temporary repo-shaped sandbox or another explicitly disposable repo created for that run, never in the contributor's checked-out OpenPlate repository.
 
 #### Scenario: Checked-in fixture content is reviewed
 - **WHEN** a contributor reviews files under `manual-tests/templates/`
@@ -117,11 +123,16 @@ Checked-in manual test fixtures SHALL live under `manual-tests/templates/` and S
 
 #### Scenario: Manual test work products are disposable
 - **WHEN** a contributor runs the manual test workflow
-- **THEN** generated repos and temporary workspaces are created only under `manual-tests/work/<case-id>/`
-- **THEN** captured outputs such as logs or prompt JSON files are created only under `manual-tests/artifacts/<case-id>/`
+- **THEN** generated repos and temporary workspaces are created only under approved disposable roots for that case
+- **AND** captured outputs such as logs or prompt JSON files are created only under disposable case-scoped locations
+
+#### Scenario: Repo-mutating manual setup uses a temporary repo sandbox
+- **WHEN** a manual-test helper needs to set repo-local git identity, change branch state, or create seed commits
+- **THEN** it performs those actions only inside a temporary repo-shaped sandbox or another disposable repo dedicated to that run
+- **AND** it does not apply those mutations to the checked-out OpenPlate repository
 
 ### Requirement: Manual test scripts support execution and cleanup
-The repository SHALL provide checked-in scripts for running manual test cases and for cleaning up manual-test working folders after execution. These scripts SHALL operate only on the manual-test workflow's disposable state and SHALL preserve checked-in fixtures and documentation.
+The repository SHALL provide checked-in scripts for running manual test cases and for cleaning up manual-test working folders after execution. These scripts SHALL operate only on the manual-test workflow's disposable state, SHALL preserve checked-in fixtures and documentation, and SHALL fail before any repo-mutating setup targets a non-disposable repository.
 
 #### Scenario: Contributor runs a manual case through the repo scripts
 - **WHEN** a contributor follows the documented manual-test workflow
@@ -131,6 +142,11 @@ The repository SHALL provide checked-in scripts for running manual test cases an
 - **WHEN** a contributor runs the documented cleanup script
 - **THEN** the script removes disposable manual-test work products
 - **THEN** the script does not remove checked-in files under `manual-tests/templates/` or the case documentation
+
+#### Scenario: Manual-test runner rejects an unsafe git target
+- **WHEN** the shared manual-test runner resolves a repo target outside its approved disposable roots or to the checked-out OpenPlate repository
+- **THEN** the runner fails before issuing repo-mutating git commands for that target
+- **AND** it reports that the target is unsafe for manual-test git setup
 
 ### Requirement: Agent guidance points to the manual test workflow
 The repository SHALL include an `AGENTS.md` file that tells future agents where the manual test workflow lives and directs them to use the checked-in `manual-tests/` guidance instead of reconstructing end-to-end commands from memory.
