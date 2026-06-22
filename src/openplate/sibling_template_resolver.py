@@ -87,6 +87,7 @@ def render_sibling_template_config(
         raw_template_reference,
         raw_dest_folder,
         raw_condition,
+        provenance=project_config.TEMPLATE_PROVENANCE_INHERITED,
     )
 
 
@@ -123,4 +124,5 @@ def copy_template_with_raw_identity(
         raw_template_reference,
         raw_dest_folder,
         raw_condition,
+        provenance=config_project_template.provenance,
     )

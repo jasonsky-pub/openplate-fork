@@ -390,6 +390,11 @@ async def _source_template_recursive_walk_single_result(
                         project_config_changed = True
                         matching_template = model_template_config
                     else:
+                        if matching_template.provenance is None:
+                            logging.debug(
+                                "Sibling found without provenance, preserving existing tracked template provenance state for %s",
+                                matching_template,
+                            )
                         logging.debug(f"Sibling found, reusing {matching_template.__str__()}")
 
                     sub_result = await _source_template_recursive_walk_single_result(

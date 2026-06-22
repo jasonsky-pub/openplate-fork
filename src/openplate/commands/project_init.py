@@ -96,6 +96,7 @@ async def run(
     )
     if tracked_template is None:
         tracked_template = options.add_template
+        tracked_template.provenance = project_config.TEMPLATE_PROVENANCE_REQUESTED
         config_project.templates.append(tracked_template)
     else:
         if not options.overwrite_existing_files:
@@ -108,6 +109,7 @@ async def run(
         tracked_template.version = options.add_template.version
         tracked_template.template_ignore_paths = options.add_template.template_ignore_paths
         tracked_template.no_cache = options.add_template.no_cache
+        tracked_template.provenance = project_config.TEMPLATE_PROVENANCE_REQUESTED
 
     allow_template_commands = settings.allow_template_commands or options.allow_template_commands
 

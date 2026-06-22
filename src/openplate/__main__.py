@@ -31,10 +31,12 @@ from openplate.cfg.project_config import ProjectTemplateConfig
 from openplate.commands import (
     config_get,
     config_set,
+    project_info,
     project_init,
     project_update,
     project_verify,
 )
+from openplate.commands.project_info import InfoOptions
 from openplate.commands.config_set import ConfigSetOptions
 from openplate.commands.project_init import InitOptions
 from openplate.commands.project_update import UpdateOptions
@@ -51,17 +53,18 @@ class DeprecatedProjectFolderAction(argparse.Action):
         parser.error("The --project-folder option has been renamed. Use --project-root instead.")
 
 
-def add_common_project_runtime_arguments(parser):
+def add_common_project_runtime_arguments(parser, include_prompt_flags: bool = True):
     parser.add_argument("-p", "--project-root", required=False,
                         help="Project Root Location: (current folder or Git top-level assumed) ")
     parser.add_argument("--project-folder", required=False, help=argparse.SUPPRESS, action=DeprecatedProjectFolderAction)
 
     parser.add_argument("--ignore-tool-version", required=False, default=False,
                         help="Ignore project required version (UNSAFE, mainly used for running locally not from pip)", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--ask-again", required=False, default=False,
-                        help="Ask already asked parameters again", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--ask-hidden", required=False, default=False,
-                        help="Ask parameters which are normally hidden", action=argparse.BooleanOptionalAction)
+    if include_prompt_flags:
+        parser.add_argument("--ask-again", required=False, default=False,
+                            help="Ask already asked parameters again", action=argparse.BooleanOptionalAction)
+        parser.add_argument("--ask-hidden", required=False, default=False,
+                            help="Ask parameters which are normally hidden", action=argparse.BooleanOptionalAction)
 
 
 def configure_project_init_parser(parser):
@@ -122,6 +125,24 @@ def configure_project_verify_parser(parser):
     parser.set_defaults(command="project-verify")
 
 
+def configure_project_info_parser(parser):
+    parser.set_defaults(command="project-info")
+    parser.add_argument(
+        "--offline",
+        required=False,
+        default=False,
+        help="Show only persisted project-file data without inspecting template sources.",
+        action=argparse.BooleanOptionalAction,
+    )
+    parser.add_argument(
+        "--show-hidden",
+        required=False,
+        default=False,
+        help="Include hidden parameters when inspecting template metadata.",
+        action=argparse.BooleanOptionalAction,
+    )
+
+
 def hide_subparser_from_help(subparsers, command_name):
     subparsers._choices_actions = [
         choice_action for choice_action in subparsers._choices_actions
@@ -140,7 +161,7 @@ def create_arg_parser(args):
         required=False, default=False, action=argparse.BooleanOptionalAction,
         help="Present an automation readable response instead of human readable one.  Use rules related to automation.")
 
-    subparsers = arg_parser.add_subparsers(required="--version" not in args, metavar="{config,init,update,verify}")
+    subparsers = arg_parser.add_subparsers(required="--version" not in args, metavar="{config,init,update,verify,info}")
 
     parser_config = subparsers.add_parser("config")
     config_subparsers = parser_config.add_subparsers(required=True)
@@ -178,6 +199,10 @@ def create_arg_parser(args):
     add_common_project_runtime_arguments(parser_verify)
     configure_project_verify_parser(parser_verify)
 
+    parser_info = subparsers.add_parser("info")
+    add_common_project_runtime_arguments(parser_info, include_prompt_flags=False)
+    configure_project_info_parser(parser_info)
+
     parser_project = subparsers.add_parser("project", help=argparse.SUPPRESS)
     add_common_project_runtime_arguments(parser_project)
     hide_subparser_from_help(subparsers, "project")
@@ -213,6 +238,9 @@ def create_arg_parser(args):
     legacy_parser_verify = project_subparsers.add_parser("verify")
     configure_project_verify_parser(legacy_parser_verify)
 
+    legacy_parser_info = project_subparsers.add_parser("info")
+    configure_project_info_parser(legacy_parser_info)
+
     return arg_parser
 
 
@@ -246,6 +274,12 @@ async def async_main(args):
     if result.debug:
         logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
+    if result.command == "project-info":
+        if getattr(result, "ask_again", False):
+            raise ValueError("--ask-again is not supported for 'openplate info'")
+        if getattr(result, "ask_hidden", False):
+            raise ValueError("Use --show-hidden instead of --ask-hidden with 'openplate info'")
+
     logging.debug(f"Python version: {platform.python_version()}")
     config_file = result.config_file or open_plate_settings.defaultSettingsLocation
 
@@ -266,8 +300,8 @@ async def async_main(args):
     prompts_json_input_present = bool(getattr(result, "prompts_json_file", None) or getattr(result, "prompts_json_stdin", False))
     if result.command.startswith("project"):
         runtime_settings = OpenPlateRuntimeSettings(
-            result.ask_again,
-            result.ask_hidden,
+            getattr(result, "ask_again", False),
+            getattr(result, "ask_hidden", False) or getattr(result, "show_hidden", False),
             result.ignore_tool_version,
             result.automation,
             getattr(result, "allow_last_updater_email", False),
@@ -364,6 +398,12 @@ async def async_main(args):
     elif result.command == "project-verify":
         options = VerifyOptions(project_context.project_root_folder)
         await project_verify.run(configuration, runtime_settings, options)
+    elif result.command == "project-info":
+        options = InfoOptions(
+            project_context.project_root_folder,
+            result.offline,
+        )
+        await project_info.run(configuration, runtime_settings, options)
     elif result.command == "project-update":
         prompt_document = load_prompt_document(result)
         if prompt_document is not None:

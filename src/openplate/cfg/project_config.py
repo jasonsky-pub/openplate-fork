@@ -27,6 +27,12 @@ from openplate.walk.recursive_walker import norm_relative_path
 
 
 _RAW_DEST_FOLDER_UNSET = object()
+TEMPLATE_PROVENANCE_REQUESTED = "requested"
+TEMPLATE_PROVENANCE_INHERITED = "inherited"
+_VALID_TEMPLATE_PROVENANCE = {
+    TEMPLATE_PROVENANCE_REQUESTED,
+    TEMPLATE_PROVENANCE_INHERITED,
+}
 
 
 def _normalize_legacy_source_field(value: Optional[str]) -> Optional[str]:
@@ -72,6 +78,7 @@ class ProjectTemplateConfig:
         raw_dest_folder = _RAW_DEST_FOLDER_UNSET,
         raw_condition: Optional[str] = None,
         requires_last_updater_email: bool = False,
+        provenance: Optional[str] = None,
     ):
         self.src_url = src_url
         self.src_name = src_name
@@ -99,6 +106,12 @@ class ProjectTemplateConfig:
         self.template_ignore_paths = template_ignore_paths
         self.no_cache = no_cache
         self.requires_last_updater_email = requires_last_updater_email
+        if provenance is not None and provenance not in _VALID_TEMPLATE_PROVENANCE:
+            raise ValueError(
+                "provenance in project configuration must be one of: "
+                + ", ".join(sorted(_VALID_TEMPLATE_PROVENANCE))
+            )
+        self.provenance = provenance
 
     def __getstate__(self):
         result = {
@@ -111,6 +124,8 @@ class ProjectTemplateConfig:
         }
         if self.requires_last_updater_email:
             result["requires_last_updater_email"] = True
+        if self.provenance is not None:
+            result["provenance"] = self.provenance
         return result
 
     def __str__(self):
@@ -295,6 +310,22 @@ def deserialize_optional_bool(data, field_name: str) -> Optional[bool]:
     return data
 
 
+def deserialize_optional_template_provenance(data) -> Optional[str]:
+    if data is None:
+        return None
+
+    if not isinstance(data, str):
+        raise TypeError("provenance in project configuration is not a string")
+
+    if data not in _VALID_TEMPLATE_PROVENANCE:
+        raise ValueError(
+            "provenance in project configuration must be one of: "
+            + ", ".join(sorted(_VALID_TEMPLATE_PROVENANCE))
+        )
+
+    return data
+
+
 def deserialize_template(settings: OpenPlateSettings, data):
     url = data.get("src_url")
 
@@ -313,6 +344,7 @@ def deserialize_template(settings: OpenPlateSettings, data):
         data.get("src_url") or data.get("src_name") or data.get("src_folder"),
         data.get("dest_folder"),
         requires_last_updater_email=deserialize_optional_bool(data.get("requires_last_updater_email"), "requires_last_updater_email") or False,
+        provenance=deserialize_optional_template_provenance(data.get("provenance")),
     )
 
 project_config_file_name = ".openplate.project.yaml"

@@ -176,6 +176,62 @@ def test_project_config_load_reads_requires_last_updater_email(tmp_path):
     assert loaded.templates[0].requires_last_updater_email is True
 
 
+def test_project_config_write_reads_template_provenance(tmp_path):
+    config = ProjectConfig(
+        [
+            ProjectTemplateConfig(
+                "https://example.com/template.git#main",
+                None,
+                None,
+                ".",
+                None,
+                {"service_name": "demo"},
+                [],
+                False,
+                provenance=project_config.TEMPLATE_PROVENANCE_REQUESTED,
+            )
+        ],
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        {},
+        {},
+        None,
+    )
+
+    config_path = tmp_path / project_config_file_name
+    project_config.to_file(config, str(config_path))
+
+    written = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert written["templates"][0]["provenance"] == project_config.TEMPLATE_PROVENANCE_REQUESTED
+
+    loaded = project_config.from_file(open_plate_settings.defaultSettings, str(config_path))
+    assert loaded.templates[0].provenance == project_config.TEMPLATE_PROVENANCE_REQUESTED
+
+
+def test_project_config_load_rejects_unknown_template_provenance(tmp_path):
+    config_path = tmp_path / project_config_file_name
+    config_path.write_text(
+        "\n".join([
+            "templates:",
+            "  - src_url: https://example.com/template.git#main",
+            "    dest_folder: .",
+            "    provenance: mystery",
+        ]),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="provenance"):
+        project_config.from_file(open_plate_settings.defaultSettings, str(config_path))
+
+
 def test_config_set_parser_rejects_removed_legacy_source_resolution_flags():
     parser = create_arg_parser(["openplate", "config", "set"])
 

@@ -66,10 +66,17 @@ Update an existing project from its template:
 openplate update
 ```
 
+Inspect the tracked template state for the current project:
+
+```
+openplate info
+openplate info --offline
+```
+
 > [!TIP]
 > Agent-friendly prompt JSON commands and usage notes are documented in [docs/commands.md](docs/commands.md). See that guide for `openplate project print-init-json` and the `openplate init --prompts-json-file` or `--prompts-json-stdin` workflow.
 
-Legacy nested `project` variants still work for compatibility, but `openplate init` and `openplate update` are the documented forms.
+Legacy nested `project` variants still work for compatibility, but `openplate init`, `openplate update`, and `openplate info` are the documented forms.
 
 The `-n/--name` and `-f/--folder` init source options are no longer supported. Use explicit URLs instead.
 

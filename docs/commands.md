@@ -87,7 +87,7 @@ This applies only to SSH template URLs. HTTPS template URLs do not use SSH keys.
 
 ### Project Root Resolution
 
-`init`, `update`, `verify`, and `project print-init-json` share the `--project-root` option.
+`init`, `update`, `verify`, `info`, and `project print-init-json` share the `--project-root` option.
 
 - `--project-root <path>` sets the managed project root explicitly.
 - if `--project-root` is omitted and the invocation folder is inside a Git work tree, OpenPlate uses the Git top-level folder as the project root and the invocation-relative path as the default `dest_folder`
@@ -100,6 +100,7 @@ Project root examples:
 openplate init --project-root C:/workspaces/my-repo https://github.com/my-org/ot-template.git#v1
 openplate update --project-root C:/workspaces/my-repo --update-full
 openplate verify --project-root C:/workspaces/my-repo
+openplate info --project-root C:/workspaces/my-repo
 ```
 
 Source URL examples:
@@ -166,6 +167,38 @@ The legacy nested `project` variant still works for compatibility, but `openplat
   ```
   openplate update --update-full
   ```
+
+## Command: info
+
+Inspect the tracked template state for the current project.
+
+```
+openplate info
+```
+
+The legacy nested `project` variant still works for compatibility, but `openplate info` is the documented command.
+
+By default, `info` reads `.openplate.project.yaml` and inspects each tracked template source so it can show the tracked template reference, destination folder, provenance, and prompt metadata such as current, default, and existing values.
+
+### Offline Inspection
+
+- `--offline` skips template inspection and shows only the data already persisted in `.openplate.project.yaml`.
+
+  ```
+  openplate info --offline
+  ```
+
+Use this mode when you want to inspect the tracked project state without fetching or cloning template sources.
+
+### Hidden Parameters
+
+- `--show-hidden` includes hidden parameters when `info` is inspecting live template metadata.
+
+  ```
+  openplate info --show-hidden
+  ```
+
+`--show-hidden` cannot be combined with `--offline` because offline mode does not inspect the template definitions needed to identify hidden parameters.
 
 ## Prompt JSON Workflow
 

@@ -104,8 +104,8 @@ def test_create_arg_parser_top_level_help_hides_project_command():
 
     help_text = parser.format_help()
 
-    assert "{config,init,update,verify}" in help_text
-    assert "{config,init,update,verify,project}" not in help_text
+    assert "{config,init,update,verify,info}" in help_text
+    assert "{config,init,update,verify,info,project}" not in help_text
     assert "==SUPPRESS==" not in help_text
 
 
@@ -118,6 +118,28 @@ def test_create_arg_parser_accepts_top_level_verify_with_shared_project_options(
     assert result.command == "project-verify"
     assert result.project_root == "workspace"
     assert result.ask_hidden is True
+
+
+def test_create_arg_parser_accepts_top_level_info_with_shared_project_options():
+    args = ["openplate", "info", "--project-root", "workspace", "--offline"]
+    parser = create_arg_parser(args)
+
+    result = parser.parse_args(args[1:])
+
+    assert result.command == "project-info"
+    assert result.project_root == "workspace"
+    assert result.offline is True
+
+
+def test_create_arg_parser_accepts_legacy_project_info_with_shared_project_options():
+    args = ["openplate", "project", "--project-root", "workspace", "info", "--show-hidden"]
+    parser = create_arg_parser(args)
+
+    result = parser.parse_args(args[1:])
+
+    assert result.command == "project-info"
+    assert result.project_root == "workspace"
+    assert result.show_hidden is True
 
 
 def test_create_arg_parser_accepts_legacy_project_verify_with_shared_project_options():
@@ -406,6 +428,33 @@ def test_async_main_dispatches_print_update_json(monkeypatch, tmp_path):
     asyncio.run(async_main(args))
 
     assert captured_options["destination"] == str(tmp_path.resolve())
+
+
+def test_async_main_dispatches_info(monkeypatch, tmp_path):
+    captured_options = {}
+
+    async def fake_run(_settings, runtime_settings, options):
+        captured_options["destination"] = options.destination
+        captured_options["offline"] = options.offline
+        captured_options["ask_hidden"] = runtime_settings.ask_hidden
+
+    monkeypatch.setattr("openplate.commands.project_info.run", fake_run)
+
+    args = [
+        "openplate",
+        "-c",
+        str(tmp_path / "missing-config.yaml"),
+        "info",
+        "--project-root",
+        str(tmp_path),
+        "--show-hidden",
+    ]
+
+    asyncio.run(async_main(args))
+
+    assert captured_options["destination"] == str(tmp_path.resolve())
+    assert captured_options["offline"] is False
+    assert captured_options["ask_hidden"] is True
 
 
 def test_async_main_uses_git_top_level_root_and_invocation_relative_dest(monkeypatch, tmp_path):
