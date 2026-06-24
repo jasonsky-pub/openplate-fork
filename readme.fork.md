@@ -9,11 +9,13 @@ This fork publishes:
 ## First: rebase this fork onto Comcast/OpenPlate
 
 Before preparing a fork release, rebase this repository onto the latest upstream `main` so the fork keeps its extra commits on top of the current `Comcast/OpenPlate` history.
+If a prior local release build temporarily changed `src/openplate/__init__.py`, restore that version file before rebasing so the rebase does not pick up a release-only edit.
 
 ```bash
 cd /run/media/private/skyzero/random/local/jasonsky-pub/openplate-fork
 
 git status --short --branch
+git restore src/openplate/__init__.py
 
 if git remote get-url upstream >/dev/null 2>&1; then
   git remote set-url upstream https://github.com/Comcast/OpenPlate
