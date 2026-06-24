@@ -1,10 +1,44 @@
-# Fork release instructions
+# Fork maintenance and release instructions
 
 This fork publishes:
 
 - PyPI package: `jsopfork`
 - Installed CLI command: `openplate`
 - Docker image: `jasonskypub/jsopfork`
+
+## First: rebase this fork onto Comcast/OpenPlate
+
+Before preparing a fork release, rebase this repository onto the latest upstream `main` so the fork keeps its extra commits on top of the current `Comcast/OpenPlate` history.
+
+```bash
+cd /run/media/private/skyzero/random/local/jasonsky-pub/openplate-fork
+
+git status --short --branch
+
+if git remote get-url upstream >/dev/null 2>&1; then
+  git remote set-url upstream https://github.com/Comcast/OpenPlate
+else
+  git remote add upstream https://github.com/Comcast/OpenPlate
+fi
+
+git fetch --prune upstream
+git branch backup/main-pre-upstream-rebase-$(date +%Y%m%d-%H%M) HEAD
+git rebase upstream/main
+```
+
+If the rebase stops on conflicts, resolve them, then continue:
+
+```bash
+git add <resolved-files>
+git rebase --continue
+```
+
+After the rebase completes, confirm the fork-specific commits still sit above `upstream/main`, then update GitHub with a lease-protected force push:
+
+```bash
+git log --oneline --decorate --graph -n 15
+git push --force-with-lease origin main
+```
 
 ## Choose and set the release version
 
